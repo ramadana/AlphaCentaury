@@ -1,0 +1,91 @@
+# modules/region/templates/cloud-init.yml
+#cloud-config
+
+hostname: ${hostname}
+fqdn: ${hostname}
+
+# Update packages
+package_update: true
+package_upgrade: true
+
+# Install essential packages
+packages:
+  - curl
+  - wget
+  - git
+  - htop
+  - tmux
+  - jq
+  - docker.io
+  - docker-compose
+
+# Configure Docker
+runcmd:
+  # Enable and start Docker
+  - systemctl enable docker
+  - systemctl start docker
+  
+  # Add core user to docker group (Flatcar uses 'core' user)
+  - usermod -aG docker core
+  
+  # Install Docker Compose
+  - curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+  - chmod +x /usr/local/bin/docker-compose
+  
+  %{ if instance_type == "ethernity" ~}
+  # GitHub Runner specific setup
+  - mkdir -p /opt/github-runner
+  - chown core:core /opt/github-runner
+  - curl -o /opt/github-runner/actions-runner-linux-x64-2.308.0.tar.gz -L https://github.com/actions/runner/releases/download/v2.308.0/actions-runner-linux-x64-2.308.0.tar.gz
+  - cd /opt/github-runner && tar xzf actions-runner-linux-x64-2.308.0.tar.gz
+  - chown -R core:core /opt/github-runner
+  %{ endif ~}
+  
+  # Set timezone
+  - timedatectl set-timezone UTC
+  
+  # Configure SSH
+  - sed -i 's/#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
+  - sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+  - systemctl reload sshd
+
+# Create necessary directories
+write_files:
+  - path: /etc/systemd/system/docker.service.d/override.conf
+    content: |
+      [Service]
+      ExecStart=
+      ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock --log-driver=journald
+    permissions: '0644'
+  
+  %{ if instance_type == "stargate" ~}
+  - path: /home/core/.bashrc_custom
+    content: |
+      # Bastion host aliases
+      alias k='kubectl'
+      alias kgp='kubectl get pods'
+      alias kgs='kubectl get services' 
+      alias kgd='kubectl get deployments'
+      alias kns='kubectl config set-context --current --namespace'
+      
+      # Export kubeconfig path
+      export KUBECONFIG=/home/core/.kube/config
+    permissions: '0644'
+    owner: core:core
+  %{ endif ~}
+
+# Final setup commands
+final_message: |
+  ${hostname} setup complete!
+  Instance type: ${instance_type}
+  
+  %{ if instance_type == "stargate" ~}
+  This is your bastion host. Configure kubectl to access your clusters.
+  %{ endif ~}
+  
+  %{ if instance_type == "ethernity" ~}
+  This is your GitHub runner host. Complete the runner setup:
+  1. cd /opt/github-runner
+  2. ./config.sh --url https://github.com/YOUR_ORG --token YOUR_TOKEN
+  3. sudo ./svc.sh install && sudo ./svc.sh start
+  %{ endif ~}
