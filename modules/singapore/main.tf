@@ -14,59 +14,17 @@ resource "vultr_kubernetes" "cluster" {
   label   = var.cluster_name
   version = var.vke_version
   
-  node_pools {
-    node_quantity = var.nodes.luminaire.node_count
-    plan          = var.nodes.luminaire.plan
-    label         = var.nodes.luminaire.label
-    auto_scaler   = var.nodes.luminaire.auto_scaler
-    min_nodes     = var.nodes.luminaire.min_nodes
-    max_nodes     = var.nodes.luminaire.max_nodes
-    
-    tag = "luminaire"
-  }
-  
-  node_pools {
-    node_quantity = var.nodes.thera.node_count
-    plan          = var.nodes.thera.plan
-    label         = var.nodes.thera.label
-    auto_scaler   = var.nodes.thera.auto_scaler
-    min_nodes     = var.nodes.thera.min_nodes
-    max_nodes     = var.nodes.thera.max_nodes
-    
-    tag = "thera"
-  }
-  
-  node_pools {
-    node_quantity = var.nodes.jita.node_count
-    plan          = var.nodes.jita.plan
-    label         = var.nodes.jita.label
-    auto_scaler   = var.nodes.jita.auto_scaler
-    min_nodes     = var.nodes.jita.min_nodes
-    max_nodes     = var.nodes.jita.max_nodes
-    
-    tag = "jita"
-  }
-  
-  node_pools {
-    node_quantity = var.nodes.umbra.node_count
-    plan          = var.nodes.umbra.plan
-    label         = var.nodes.umbra.label
-    auto_scaler   = var.nodes.umbra.auto_scaler
-    min_nodes     = var.nodes.umbra.min_nodes
-    max_nodes     = var.nodes.umbra.max_nodes
-    
-    tag = "umbra"
-  }
-  
-  node_pools {
-    node_quantity = var.nodes.perimeter.node_count
-    plan          = var.nodes.perimeter.plan
-    label         = var.nodes.perimeter.label
-    auto_scaler   = var.nodes.perimeter.auto_scaler
-    min_nodes     = var.nodes.perimeter.min_nodes
-    max_nodes     = var.nodes.perimeter.max_nodes
-    
-    tag = "perimeter"
+  dynamic "node_pools" {
+    for_each = var.nodes
+    content {
+      node_quantity = node_pools.value.node_count
+      plan          = node_pools.value.plan
+      label         = node_pools.value.label
+      auto_scaler   = node_pools.value.auto_scaler
+      min_nodes     = node_pools.value.min_nodes
+      max_nodes     = node_pools.value.max_nodes
+      tag           = node_pools.key
+    }
   }
 }
 

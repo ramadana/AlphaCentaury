@@ -11,8 +11,8 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-TERRAFORM_VERSION="1.6.0"
-KUBECTL_VERSION="v1.28.2"
+TERRAFORM_VERSION="1.13.1"
+KUBECTL_VERSION="v1.32.2"
 PROJECT_NAME="skies-infrastructure"
 
 echo -e "${BLUE}========================================${NC}"
