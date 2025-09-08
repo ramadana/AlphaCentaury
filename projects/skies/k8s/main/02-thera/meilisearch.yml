@@ -20,7 +20,7 @@ spec:
         node-role: thera
       containers:
         - name: meilisearch
-          image: getmeili/meilisearch:v1.15.2
+          image: getmeili/meilisearch:v1.24
           command: ["/bin/sh"]
           args:
             - "-c"
@@ -53,7 +53,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: meilisearch-local-pv
+  name: meilisearch-local-pv-1
 spec:
   capacity:
     storage: 15Gi
@@ -61,7 +61,7 @@ spec:
     - ReadWriteOnce
   storageClassName: local-path
   local:
-    path: /mnt/data/meilisearch-prod
+    path: /mnt/data/meilisearch
   nodeAffinity:
     required:
       nodeSelectorTerms:
@@ -86,8 +86,8 @@ spec:
       targetPort: 7700
       nodePort: 31704
       protocol: TCP
-
-
+      
+      
 # first-time init
 # args:
 #   - "-c"
