@@ -1,0 +1,15 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: festival-ingress
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /v1/festival
+        pathType: Prefix
+        backend:
+          service:
+            name: festival
+            port:
+              name: web

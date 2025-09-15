@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: skies
+spec:
+  serviceName: "postgres"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+        tier: db
+        skies/group: db
+    spec:
+      nodeSelector:
+        node-role: thera
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          env:
+            - name: POSTGRES_DB
+              value: skies_db
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_INITDB_POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_INITDB_POSTGRES_PASSWORD
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 30Gi
+        storageClassName: local-path
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-local-pv
+spec:
+  capacity:
+    storage: 30Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  local:
+    path: /mnt/data/postgresql
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: node-role
+              operator: In
+              values:
+                - thera
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: skies
+spec:
+  selector:
+      app: postgres
+  type: NodePort
+  ports:
+    - port: 5432
+      targetPort: 5432
+      nodePort: 31703
+      protocol: TCP
