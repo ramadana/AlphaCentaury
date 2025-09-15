@@ -1,9 +1,10 @@
 config/
 *.sh
 *.yml
-!main/**/*.yaml
-!main/**/*.yml
-!noc/*.yaml
+!sgp/**/*.yaml
+!sgp/**/*.yml
+!nrt/*.yaml
+!nrt/*.yml
 !services/**/*.yml
 !services-old/*.yml
 !services-old/**/*.yml
