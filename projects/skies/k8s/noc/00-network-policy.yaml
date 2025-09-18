@@ -1,0 +1,40 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: noc-ingress-policy
+  namespace: noc
+spec:
+  podSelector: {}  # Apply to all pods in the namespace
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow HTTP traffic
+    - ports:
+        - protocol: TCP
+          port: 80
+    # Allow HTTPS traffic
+    - ports:
+        - protocol: TCP
+          port: 443
+    # Allow NodePort range 32001-32100
+    - ports:
+        - protocol: TCP
+          port: 32001
+          endPort: 32100
+    # Allow internal cluster communication (pods talking to each other)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: noc
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 3000  # Grafana
+        - protocol: TCP
+          port: 9090  # Prometheus
+        - protocol: TCP
+          port: 3100  # Loki
+        - protocol: TCP
+          port: 3001  # Metabase
+        - protocol: TCP
+          port: 5432  # PostgreSQL
