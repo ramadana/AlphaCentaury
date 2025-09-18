@@ -3,7 +3,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: loki-config
-  namespace: noc
 data:
   loki.yaml: |
     auth_enabled: false
@@ -68,7 +67,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: loki
-  namespace: noc
   labels:
     app: loki
     tier: logging
@@ -140,7 +138,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: loki
-  namespace: noc
   labels:
     app: loki
     tier: logging
@@ -164,7 +161,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: promtail-config
-  namespace: noc
 data:
   config.yml: |
     server:
@@ -215,7 +211,6 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: promtail
-  namespace: noc
   labels:
     app: promtail
     tier: logging
@@ -277,7 +272,6 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: promtail
-  namespace: noc
 
 ---
 # Promtail ClusterRole
@@ -308,4 +302,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: promtail
-  namespace: noc
+  namespace: default

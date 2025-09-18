@@ -2,7 +2,6 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: noc-ingress-policy
-  namespace: noc
 spec:
   podSelector: {}  # Apply to all pods in the namespace
   policyTypes:
@@ -25,7 +24,7 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              name: noc
+              name: default
         - podSelector: {}
       ports:
         - protocol: TCP
