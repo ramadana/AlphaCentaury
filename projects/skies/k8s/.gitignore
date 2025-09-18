@@ -1,0 +1,6 @@
+config/
+*.sh
+*.yml
+!services/**/*.yml
+!services-old/*.yml
+!services-old/**/*.yml
