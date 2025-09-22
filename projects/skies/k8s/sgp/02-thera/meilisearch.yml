@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: meilisearch
+  namespace: skies
+spec:
+  serviceName: "meilisearch"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: meilisearch
+  template:
+    metadata:
+      labels:
+        app: meilisearch
+        tier: db
+        skies/group: db
+    spec:
+      nodeSelector:
+        node-role: thera
+      containers:
+        - name: meilisearch
+          image: getmeili/meilisearch:v1.24
+          command: ["/bin/sh"]
+          args:
+            - "-c"
+            - |
+              meilisearch \
+                --env production \
+                --master-key "$MEILISEARCH_MASTER_KEY"
+          env:
+            - name: MEILISEARCH_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: meilisearch-secret
+                  key: MEILISEARCH_MASTER_KEY
+          ports:
+            - containerPort: 7700
+          volumeMounts:
+            - name: meilisearch-storage
+              mountPath: /meili_data
+  volumeClaimTemplates:
+    - metadata:
+        name: meilisearch-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 15Gi
+        storageClassName: local-path
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: meilisearch-local-pv-1
+spec:
+  capacity:
+    storage: 15Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  local:
+    path: /mnt/data/meilisearch
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: node-role
+              operator: In
+              values:
+                - thera
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: meilisearch
+  namespace: skies
+spec:
+  selector:
+      app: meilisearch
+  type: NodePort
+  ports:
+    - port: 7700
+      targetPort: 7700
+      nodePort: 31704
+      protocol: TCP
+      
+      
+# first-time init
+# args:
+#   - "-c"
+#   - |
+#     curl -o /meili_data/dumps/latest.dump "https://sgp1.vultrobjects.com/skies-backups/meilisearch/20250727-083804983.dump?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=Y9IRNULPFJGOZAOQO5O2%2F20250727%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20250727T143755Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=af081d10974787945f815ffb6008bcb85addf490ae00e824c999fc1529b26b06" && \
+#     meilisearch \
+#       --env production \
+#       --master-key "$MEILISEARCH_MASTER_KEY" \
+#       --import-dump /meili_data/dumps/latest.dump
