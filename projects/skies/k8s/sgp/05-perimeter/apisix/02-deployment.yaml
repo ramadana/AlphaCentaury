@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apisix
+  namespace: skies
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: apisix
+  template:
+    metadata:
+      labels:
+        app: apisix
+    spec:
+      nodeSelector:
+        skies/node: perimeter
+      containers:
+        - name: apisix
+          image: apache/apisix:3.8.0-alpine
+          ports:
+            - containerPort: 9080
+            - containerPort: 9443
+            - containerPort: 9091 # prometheus exporter
+          volumeMounts:
+            - name: apisix-config
+              mountPath: /usr/local/apisix/conf/config.yaml
+              subPath: config.yaml
+            - name: apisix-config
+              mountPath: /usr/local/apisix/conf/nginx.conf
+              subPath: nginx.conf
+      volumes:
+        - name: apisix-config
+          configMap:
+            name: apisix-config
