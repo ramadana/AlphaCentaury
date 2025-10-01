@@ -1,89 +1,45 @@
-# outputs.tf
-
-# Singapore Cluster Outputs
-output "singapore_cluster_id" {
-  description = "Singapore VKE cluster ID"
-  value       = module.singapore.cluster_id
+output "cluster_id" {
+  description = "VKE cluster ID"
+  value       = vultr_kubernetes.skies_nrt.id
 }
 
-output "singapore_cluster_endpoint" {
-  description = "Singapore VKE cluster endpoint"
-  value       = module.singapore.cluster_endpoint
+output "cluster_endpoint" {
+  description = "VKE cluster API endpoint"
+  value       = vultr_kubernetes.skies_nrt.endpoint
 }
 
-output "singapore_cluster_ip" {
-  description = "Singapore VKE cluster IP"
-  value       = module.singapore.cluster_ip
+output "cluster_ip" {
+  description = "VKE cluster IP address"
+  value       = vultr_kubernetes.skies_nrt.ip
 }
 
-# Tokyo Cluster Outputs
-output "tokyo_cluster_id" {
-  description = "Tokyo VKE cluster ID"
-  value       = module.tokyo.cluster_id
+output "cluster_subnet" {
+  description = "VPC subnet CIDR for the cluster"
+  value       = format("%s/%d", data.vultr_vpc.nrt_skies.v4_subnet, data.vultr_vpc.nrt_skies.v4_subnet_mask)
 }
 
-output "tokyo_cluster_endpoint" {
-  description = "Tokyo VKE cluster endpoint"
-  value       = module.tokyo.cluster_endpoint
+output "cluster_version" {
+  description = "Kubernetes version running on the cluster"
+  value       = vultr_kubernetes.skies_nrt.version
 }
 
-output "tokyo_cluster_ip" {
-  description = "Tokyo VKE cluster IP"
-  value       = module.tokyo.cluster_ip
-}
-
-# VPS Instance Outputs
-output "singapore_vps_instances" {
-  description = "Singapore VPS instances"
-  value       = module.singapore.vps_instances
-}
-
-# Node Pool Information
-output "singapore_node_pools" {
-  description = "Singapore node pools"
-  value       = module.singapore.node_pools
-}
-
-output "tokyo_node_pools" {
-  description = "Tokyo node pools"
-  value       = module.tokyo.node_pools
-}
-
-# Kubeconfig files (sensitive)
-output "singapore_kubeconfig" {
-  description = "Singapore cluster kubeconfig"
-  value       = module.singapore.kubeconfig
+output "kube_config" {
+  description = "Kubeconfig for accessing the cluster (if available)"
+  value       = try(vultr_kubernetes.skies_nrt.kube_config, null)
   sensitive   = true
 }
 
-output "tokyo_kubeconfig" {
-  description = "Tokyo cluster kubeconfig"
-  value       = module.tokyo.kubeconfig
-  sensitive   = true
+output "node_pool_alikara" {
+  description = "Information about alikara node pool (inline with cluster)"
+  value       = vultr_kubernetes.skies_nrt.node_pools
 }
 
-# Load Balancer Information
-output "cloudflare_load_balancer_id" {
-  description = "Cloudflare Load Balancer ID"
-  value       = module.cloudflare_lb.load_balancer_id
+output "node_pool_sobaseki_id" {
+  description = "ID of sobaseki node pool"
+  value       = vultr_kubernetes_node_pools.sobaseki.id
 }
 
-output "cloudflare_pool_id" {
-  description = "Cloudflare Origin Pool ID"
-  value       = module.cloudflare_lb.pool_id
-}
-
-# Summary Information
-output "infrastructure_summary" {
-  description = "Infrastructure deployment summary"
-  value = {
-    singapore = {
-      cluster_endpoint = module.singapore.cluster_endpoint
-      vps_instances   = module.singapore.vps_instances
-    }
-    tokyo = {
-      cluster_endpoint = module.tokyo.cluster_endpoint
-    }
-    domain = var.domain_name
-  }
+output "firewall_group_id" {
+  description = "Auto-generated firewall group ID for the cluster"
+  value       = vultr_kubernetes.skies_nrt.firewall_group_id
 }
