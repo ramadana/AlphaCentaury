@@ -1,22 +1,29 @@
-# main.tf
 terraform {
   required_version = ">= 1.0"
+
   required_providers {
     vultr = {
       source  = "vultr/vultr"
       version = "~> 2.0"
     }
-    cloudflare = {
-      source  = "cloudflare/cloudflare"
-      version = "~> 4.0"
-    }
   }
-  
+
   backend "s3" {
-    # Configure your remote state backend here
-    # bucket = "your-terraform-state-bucket"
-    # key    = "skies/terraform.tfstate"
-    # region = "us-east-1"
+    endpoint                    = "https://sgp1.vultrobjects.com"
+    bucket                      = "skies-infra"
+    key                         = "terraform/skies-nrt.tfstate"
+    region                      = "sgp"
+
+    # Vultr Object Storage compatibility options
+    skip_credentials_validation = true
+    skip_metadata_api_check     = true
+    skip_region_validation      = true
+    skip_requesting_account_id  = true
+    force_path_style            = true
+
+    # Access keys provided for the backend
+    access_key = "Y9IRNULPFJGOZAOQO5O2"
+    secret_key = "966ax8eKqk0legnJGX5mFytCnP6K6pl2iDqMke7s"
   }
 }
 
@@ -24,226 +31,83 @@ provider "vultr" {
   api_key = var.vultr_api_key
 }
 
-provider "cloudflare" {
-  api_token = var.cloudflare_api_token
-}
-
-# Data sources
-data "vultr_region" "sgp" {
+# Lookup existing VPC by its ID (Tokyo)
+data "vultr_vpc" "nrt_skies" {
   filter {
     name   = "id"
-    values = ["sgp"]
+    values = ["a4290707-a165-4517-a585-5112c992aa6b"]
   }
 }
 
-data "vultr_region" "nrt" {
-  filter {
-    name   = "id"
-    values = ["nrt"]
+# VKE cluster (Tokyo) with initial node pool
+# Note: VKE automatically creates a firewall group when enable_firewall = true
+resource "vultr_kubernetes" "skies_nrt" {
+  region          = "nrt"
+  version         = var.kubernetes_version
+  label           = "skies-nrt"
+  enable_firewall = true
+  vpc_id          = data.vultr_vpc.nrt_skies.id
+
+  # Initial node pool: alikara (vhp-4c-8gb-amd)
+  node_pools {
+    node_quantity = 1
+    plan          = "vhp-4c-8gb-amd"
+    label         = "alikara"
+    auto_scaler   = false
+    min_nodes     = 1
+    max_nodes     = 1
   }
 }
 
-data "vultr_os" "flatcar" {
-  filter {
-    name   = "name"
-    values = ["Flatcar Container Linux"]
-  }
+# Additional node pool: sobaseki (vhp-2c-4gb-amd)
+resource "vultr_kubernetes_node_pools" "sobaseki" {
+  cluster_id    = vultr_kubernetes.skies_nrt.id
+  node_quantity = 1
+  plan          = "vhp-2c-4gb-amd"
+  label         = "sobaseki"
+  auto_scaler   = false
+  min_nodes     = 1
+  max_nodes     = 1
 }
 
-# Singapore Infrastructure
-module "singapore" {
-  source = "./modules/region"
-  
-  region_code    = "sgp"
-  cluster_name   = "skies-sgp"
-  region_id      = data.vultr_region.sgp.id
-  os_id          = data.vultr_os.flatcar.id
-  
-  # VKE Configuration
-  vke_version = var.kubernetes_version
-  
-  # Node configurations
-  nodes = {
-    luminaire = {
-      plan        = var.node_plans.luminaire
-      label       = "luminaire"
-      auto_scaler = false
-      min_nodes   = 1
-      max_nodes   = 1
-      node_count  = 1
-    }
-    thera = {
-      plan        = var.node_plans.thera
-      label       = "thera"
-      auto_scaler = false
-      min_nodes   = 1
-      max_nodes   = 1
-      node_count  = 1
-    }
-    jita = {
-      plan        = var.node_plans.jita
-      label       = "jita"
-      auto_scaler = false
-      min_nodes   = 1
-      max_nodes   = 1
-      node_count  = 1
-    }
-    umbra = {
-      plan        = var.node_plans.umbra
-      label       = "umbra"
-      auto_scaler = false
-      min_nodes   = 1
-      max_nodes   = 1
-      node_count  = 1
-    }
-    perimeter = {
-      plan        = var.node_plans.perimeter
-      label       = "perimeter"
-      auto_scaler = false
-      min_nodes   = 1
-      max_nodes   = 1
-      node_count  = 1
-    }
-  }
-  
-  # VPS instances
-  vps_instances = {
-    stargate = {
-      plan    = var.vps_plans.stargate
-      label   = "stargate-sgp"
-      hostname = "stargate.sgp.skies.local"
-    }
-    ethernity = {
-      plan     = var.vps_plans.ethernity
-      label    = "ethernity-sgp"
-      hostname = "ethernity.sgp.skies.local"
-    }
-  }
-  
-  # SSH Key
-  ssh_key_ids = [vultr_ssh_key.main.id]
-  
-  tags = {
-    Environment = var.environment
-    Project     = "skies"
-    Region      = "singapore"
-  }
+# Firewall rules for the VKE cluster
+# These rules are added to the auto-generated firewall group
+resource "vultr_firewall_rule" "allow_http" {
+  firewall_group_id = vultr_kubernetes.skies_nrt.firewall_group_id
+  protocol          = "tcp"
+  ip_type           = "v4"
+  subnet            = "0.0.0.0"
+  subnet_size       = 0
+  port              = "80"
+  notes             = "HTTP from anywhere"
 }
 
-# Tokyo Infrastructure  
-module "tokyo" {
-  source = "./modules/region"
-  
-  region_code    = "nrt"
-  cluster_name   = "skies-nrt"
-  region_id      = data.vultr_region.nrt.id
-  os_id          = data.vultr_os.flatcar.id
-  
-  # VKE Configuration
-  vke_version = var.kubernetes_version
-  
-  # Node configurations (identical to Singapore)
-  nodes = {
-    luminaire = {
-      plan        = var.node_plans.luminaire
-      label       = "luminaire"
-      auto_scaler = false
-      min_nodes   = 1
-      max_nodes   = 1
-      node_count  = 1
-    }
-    thera = {
-      plan        = var.node_plans.thera
-      label       = "thera"
-      auto_scaler = false
-      min_nodes   = 1
-      max_nodes   = 1
-      node_count  = 1
-    }
-    jita = {
-      plan        = var.node_plans.jita
-      label       = "jita"
-      auto_scaler = false
-      min_nodes   = 1
-      max_nodes   = 1
-      node_count  = 1
-    }
-    umbra = {
-      plan        = var.node_plans.umbra
-      label       = "umbra"
-      auto_scaler = false
-      min_nodes   = 1
-      max_nodes   = 1
-      node_count  = 1
-    }
-    perimeter = {
-      plan        = var.node_plans.perimeter
-      label       = "perimeter"
-      auto_scaler = false
-      min_nodes   = 1
-      max_nodes   = 1
-      node_count  = 1
-    }
-  }
-  
-  # No VPS instances in Tokyo (failover cluster only)
-  vps_instances = {}
-  
-  # SSH Key
-  ssh_key_ids = [vultr_ssh_key.main.id]
-  
-  tags = {
-    Environment = var.environment
-    Project     = "skies"
-    Region      = "tokyo"
-  }
+resource "vultr_firewall_rule" "allow_https" {
+  firewall_group_id = vultr_kubernetes.skies_nrt.firewall_group_id
+  protocol          = "tcp"
+  ip_type           = "v4"
+  subnet            = "0.0.0.0"
+  subnet_size       = 0
+  port              = "443"
+  notes             = "HTTPS from anywhere"
 }
 
-# SSH Key
-resource "vultr_ssh_key" "main" {
-  name    = "skies-main-key"
-  ssh_key = var.ssh_public_key
+resource "vultr_firewall_rule" "allow_range_bastion1" {
+  firewall_group_id = vultr_kubernetes.skies_nrt.firewall_group_id
+  protocol          = "tcp"
+  ip_type           = "v4"
+  subnet            = "45.32.103.199"
+  subnet_size       = 32
+  port              = "31501:31800"
+  notes             = "App ports from 45.32.103.199/32"
 }
 
-# Cloudflare Load Balancer
-module "cloudflare_lb" {
-  source = "./modules/cloudflare"
-  
-  zone_id = var.cloudflare_zone_id
-  
-  # Origins from both regions
-  origins = {
-    singapore = {
-      name    = "skies-sgp"
-      address = module.singapore.cluster_endpoint
-      enabled = true
-      weight  = 1.0
-    }
-    tokyo = {
-      name    = "skies-nrt" 
-      address = module.tokyo.cluster_endpoint
-      enabled = true
-      weight  = 0.5  # Lower weight for failover
-    }
-  }
-  
-  # Health check configuration
-  health_check = {
-    enabled     = true
-    path        = "/health"
-    interval    = 60
-    retries     = 2
-    timeout     = 5
-    method      = "GET"
-    expected_codes = "200"
-  }
-  
-  # Pool configuration
-  pool_name        = "skies-main-pool"
-  load_balancer_name = var.domain_name
-  
-  tags = {
-    Environment = var.environment
-    Project     = "skies"
-  }
+resource "vultr_firewall_rule" "allow_range_bastion2" {
+  firewall_group_id = vultr_kubernetes.skies_nrt.firewall_group_id
+  protocol          = "tcp"
+  ip_type           = "v4"
+  subnet            = "149.28.159.131"
+  subnet_size       = 32
+  port              = "31501:31800"
+  notes             = "App ports from 149.28.159.131/32"
 }
