@@ -20,7 +20,7 @@ spec:
         node-role: thera
       containers:
         - name: meilisearch
-          image: getmeili/meilisearch:v1.24
+          image: getmeili/meilisearch:v1.24.0
           command: ["/bin/sh"]
           args:
             - "-c"
@@ -92,8 +92,8 @@ spec:
 # args:
 #   - "-c"
 #   - |
-#     curl -o /meili_data/dumps/latest.dump "https://sgp1.vultrobjects.com/skies-backups/meilisearch/20250727-083804983.dump?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=Y9IRNULPFJGOZAOQO5O2%2F20250727%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20250727T143755Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=af081d10974787945f815ffb6008bcb85addf490ae00e824c999fc1529b26b06" && \
+#     curl -o /meili_data/dumps/latest.dump "https://sgp1.vultrobjects.com/skies-backups/meilisearch/20250727-083804983.dump?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=Y9IRNULPFJGOZAOQO5O2%2F20251031%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20251031T193844Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=b80c8396e9921c40f2b46890f4047586f294f99dbc9441fec028e3e63b31a2ec" && \
 #     meilisearch \
 #       --env production \
 #       --master-key "$MEILISEARCH_MASTER_KEY" \
-#       --import-dump /meili_data/dumps/latest.dump
+#       --import-dump /meili_data/dumps/latest.dump 20250731-075123672.dump
