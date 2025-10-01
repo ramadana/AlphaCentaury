@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: dragonfly
+  namespace: skies
+spec:
+  serviceName: "dragonfly"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dragonfly
+  template:
+    metadata:
+      labels:
+        app: dragonfly
+        tier: db
+        skies/group: db
+    spec:
+      nodeSelector:
+        node-role: thera
+      containers:
+        - name: dragonfly
+          image: docker.dragonflydb.io/dragonflydb/dragonfly:latest
+          ports:
+            - containerPort: 6379
+          volumeMounts:
+            - name: dragonfly-storage
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: dragonfly-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 12Gi
+        storageClassName: local-path
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: dragonfly-local-pv
+spec:
+  capacity:
+    storage: 12Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  local:
+    path: /mnt/data/dragonfly
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: node-role
+              operator: In
+              values:
+                - thera
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dragonfly
+  namespace: skies
+spec:
+  selector:
+      app: dragonfly
+  type: NodePort
+  ports:
+    - port: 6379
+      targetPort: 6379
+      nodePort: 31705
+      protocol: TCP
