@@ -1,0 +1,56 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: noc-ingress-policy
+spec:
+  podSelector: {}  # Apply to all pods in the namespace
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow HTTP traffic ONLY to nginx app
+    - ports:
+        - protocol: TCP
+          port: 80
+      to:
+        - podSelector:
+            matchLabels:
+              skies/app: nginx
+    # Allow HTTPS traffic ONLY to nginx app
+    - ports:
+        - protocol: TCP
+          port: 443
+      to:
+        - podSelector:
+            matchLabels:
+              skies/app: nginx
+    # Allow NodePort range 32001-32100
+    - ports:
+        - protocol: TCP
+          port: 32001
+          endPort: 32100
+    # Allow internal cluster communication (pods talking to each other)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: default
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 3000  # Grafana
+        - protocol: TCP
+          port: 9090  # Prometheus
+        - protocol: TCP
+          port: 3100  # Loki
+        - protocol: TCP
+          port: 3001  # Metabase
+        - protocol: TCP
+          port: 5432  # PostgreSQL
+    # Allow Kafka brokers to push/pull telemetry/logs
+    - from:
+        - ipBlock:
+            cidr: <CIDR_or_IP_of_Kafka_nodes>
+      ports:
+        - protocol: TCP
+          port: 9090  # Prometheus ingest (if using adapter)
+        - protocol: TCP
+          port: 3100  # Loki ingest (if using promtail/kafka consumer)
