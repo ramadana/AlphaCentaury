@@ -1,6 +1,7 @@
 config/
 *.sh
 *.yml
+!legacy/**/*
 !sgp/**/*.yaml
 !sgp/**/*.yml
 !nrt/*.yaml
@@ -8,3 +9,4 @@ config/
 !services/**/*.yml
 !services-old/*.yml
 !services-old/**/*.yml
+*.DS_Store
