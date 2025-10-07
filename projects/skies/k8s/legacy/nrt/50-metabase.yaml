@@ -1,0 +1,105 @@
+# Metabase Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metabase
+  labels:
+    app: metabase
+    tier: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metabase
+  template:
+    metadata:
+      labels:
+        app: metabase
+        tier: analytics
+    spec:
+      nodeSelector:
+        skies/node: zarzakh
+      containers:
+        - name: metabase
+          image: metabase/metabase:v0.47-alpine
+          ports:
+            - containerPort: 3001
+              name: metabase
+          env:
+            - name: MB_DB_TYPE
+              value: postgres
+            - name: MB_DB_DBNAME
+              value: noc_db
+            - name: MB_DB_PORT
+              value: "5432"
+            - name: MB_DB_USER
+              value: postgres
+            - name: MB_DB_PASS
+              value: password123
+            - name: MB_DB_HOST
+              value: postgresql
+            - name: MB_EMAIL_SMTP_HOST
+              value: ""
+            - name: MB_EMAIL_SMTP_PORT
+              value: ""
+            - name: MB_EMAIL_SMTP_USERNAME
+              value: ""
+            - name: MB_EMAIL_SMTP_PASSWORD
+              value: ""
+            - name: MB_EMAIL_SMTP_SECURITY
+              value: none
+            - name: JAVA_TIMEZONE
+              value: UTC
+            - name: MB_JETTY_HOST
+              value: 0.0.0.0
+            - name: MB_JETTY_PORT
+              value: "3001"
+          volumeMounts:
+            - name: metabase-storage
+              mountPath: /metabase-data
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3001
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+      volumes:
+        - name: metabase-storage
+          persistentVolumeClaim:
+            claimName: metabase-pvc
+
+---
+# Metabase Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: metabase
+  labels:
+    app: metabase
+    tier: analytics
+spec:
+  type: ClusterIP
+  selector:
+    app: metabase
+  ports:
+    - port: 3001
+      targetPort: 3001
+      protocol: TCP
+      name: metabase
