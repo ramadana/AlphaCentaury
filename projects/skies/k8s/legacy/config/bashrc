@@ -1,0 +1,31 @@
+# .bashrc
+
+# Source global definitions
+if [ -f /etc/bashrc ]; then
+	. /etc/bashrc
+fi
+
+# User specific environment
+if ! [[ "$PATH" =~ "$HOME/.local/bin:$HOME/bin:" ]]
+then
+    PATH="$HOME/.local/bin:$HOME/bin:$PATH"
+fi
+export PATH
+
+# Uncomment the following line if you don't like systemctl's auto-paging feature:
+# export SYSTEMD_PAGER=
+
+# User specific aliases and functions
+ 
+alias rm='rm -i'
+alias cp='cp -i'
+alias mv='mv -i'
+
+[[ -f /opt/vultr/vultr_app.sh ]] && . /opt/vultr/vultr_app.sh
+
+# Additions
+PS1="\e[1;31m[\u@\h \e[1;36m\W\e[1;31m]\e[0m\$ "
+
+alias c-luminaire='ssh -p 44022 root@10.40.112.4'
+alias c-perimeter='ssh root@10.40.96.6'
+alias c-duannes='ssh -p 44022 root@10.40.96.4'
