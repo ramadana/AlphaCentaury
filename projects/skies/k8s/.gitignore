@@ -4,8 +4,8 @@ config/
 !legacy/**/*
 !sgp/**/*.yaml
 !sgp/**/*.yml
-!nrt/*.yaml
-!nrt/*.yml
+!nrt/**/*.yml
+!nrt/**/*.yaml
 !services/**/*.yml
 !services-old/*.yml
 !services-old/**/*.yml
