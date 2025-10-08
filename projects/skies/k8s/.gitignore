@@ -9,4 +9,5 @@ config/
 !services/**/*.yml
 !services-old/*.yml
 !services-old/**/*.yml
+legacy/config/ssh
 *.DS_Store
