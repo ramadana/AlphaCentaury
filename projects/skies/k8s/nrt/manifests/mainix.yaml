@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mainix
+spec:
+  nodeSelector:
+    skies/node-role: infra
+  hostPID: true
+  hostNetwork: true
+  hostIPC: true
+  containers:
+  - name: deleter-container
+    image: busybox
+    command: ["/bin/sh", "-c", "sleep 3600"] # Keep the pod running for commands
+    securityContext:
+      privileged: true
+    volumeMounts:
+    - mountPath: /host
+      name: host-root-volume
+  volumes:
+  - name: host-root-volume
+    hostPath:
+      path: /
