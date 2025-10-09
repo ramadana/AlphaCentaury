@@ -4,7 +4,7 @@ metadata:
   name: mainix
 spec:
   nodeSelector:
-    name: alikara-2d6f56ee87ec
+    skies/node-role: infra
   hostPID: true
   hostNetwork: true
   hostIPC: true
