@@ -1,0 +1,61 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stratios
+  labels:
+    app: stratios
+spec:
+  replicas: 1
+  selector: 
+    matchLabels:
+      app: stratios
+  template:
+    metadata:
+      labels:
+        app: stratios
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: skies/node-role
+                    operator: In
+                    values:
+                      - infra
+      containers:
+        - name: stratios
+          image: ghcr.io/your-org/stratios:1.0   # Replace with your actual image
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 22
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+          volumeMounts:
+            - name: ssh-keys
+              mountPath: /root/.ssh/authorized_keys
+              subPath: authorized_keys
+      volumes:
+        - name: ssh-keys
+          secret:
+            secretName: stratios-ssh-keys
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stratios
+  labels:
+    app: stratios
+spec:
+  type: NodePort
+  selector:
+    app: stratios
+  ports:
+    - name: ssh
+      protocol: TCP
+      port: 22
+      targetPort: 22
+      nodePort: 31522
