@@ -37,16 +37,8 @@ spec:
         app: postgresql
         tier: database
     spec:
-      # Node affinity: schedule on alikara (infra node)
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: skies/node-role
-                    operator: In
-                    values:
-                      - infra
+      nodeSelector:
+        skies/node-role: infra
 
       containers:
         - name: postgres
