@@ -108,22 +108,22 @@ spec:
   ports:
     - port: 9080
       targetPort: 9080
-      nodePort: 30080
+      nodePort: 31502
       protocol: TCP
       name: http
     - port: 9443
       targetPort: 9443
-      nodePort: 30443
+      nodePort: 31503
       protocol: TCP
       name: https
     - port: 9180
       targetPort: 9180
-      nodePort: 30180
+      nodePort: 31504
       protocol: TCP
       name: admin
     - port: 9100
       targetPort: 9100
-      nodePort: 30100
+      nodePort: 31505
       protocol: TCP
       name: stream-tcp
 
