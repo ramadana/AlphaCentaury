@@ -11,10 +11,7 @@ spec:
   template:
     metadata:
       labels:
-        app: postgres
-        tier: db
         skies/group: db
-    spec:
       nodeSelector:
         skies/node-role: infra
       containers:
