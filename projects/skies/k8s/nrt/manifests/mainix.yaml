@@ -4,7 +4,7 @@ metadata:
   name: mainix
 spec:
   nodeSelector:
-    skies/node-role: infra
+    skies/node-role: app
   hostPID: true
   hostNetwork: true
   hostIPC: true
