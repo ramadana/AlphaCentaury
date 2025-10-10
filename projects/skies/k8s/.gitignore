@@ -10,4 +10,5 @@ config/
 !services-old/*.yml
 !services-old/**/*.yml
 legacy/config/ssh
+nrt/manifests/notes.md
 *.DS_Store
