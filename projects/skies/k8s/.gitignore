@@ -1,6 +1,7 @@
 config/
 *.sh
 *.yml
+!legacy/**/*
 !sgp/**/*.yaml
 !sgp/**/*.yml
 !nrt/*.yaml
