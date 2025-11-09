@@ -1,89 +1,92 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: apisix-config
+  name: loki-config
 data:
-  config.yaml: |
-    apisix:
-      node_listen: 9080
-      enable_reuseport: true
-      enable_ipv6: false
-      stream_proxy:
-        only: false
-        tcp:
-          - 9100
-      ssl:
-        listen_port: 9443
-        ssl_protocols: "TLSv1.2 TLSv1.3"
-      enable_admin: true
-      admin_listen:
-        ip: 0.0.0.0
-        port: 9180
-      enable_dev_mode: false
-      show_profile_response_header: true
-    etcd:
-      host:
-        - "http://127.0.0.1:2379"
-      timeout: 30
-    discovery:
-      kubernetes:
-        service:
-          schema: http
-          host: "127.0.0.1"
-          port: 6379
+  loki-config.yaml: |
+    auth_enabled: false
+
+    server:
+      http_listen_port: 3100
+
+    common:
+      instance_addr: 127.0.0.1
+      path_prefix: /loki
+      storage:
+        filesystem:
+          chunks_directory: /loki/chunks
+          rules_directory: /loki/rules
+      replication_factor: 1
+
+    schema_config:
+      configs:
+        - from: 2020-10-24
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: index_
+            period: 24h
+
+    storage_config:
+      filesystem:
+        chunks_directory: /loki/chunks
+        rules_directory: /loki/rules
+
+      tsdb_shipper:
+        active_index_directory: /loki/tsdb-index
+        cache_location: /loki/tsdb-cache
+        shared_store: filesystem
+
+    ruler:
+      storage:
+        type: local
+        local:
+          directory: /loki/rules
+      rule_path: /loki/rules-temp
+      alertmanager_url: http://alertmanager:9093
+      ring:
+        kvstore:
+          store: inmemory
+
+    limits_config:
+      retention_period: 7d
+
+    compactor:
+      working_directory: /loki/compactor
 
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: apisix
+  name: loki
 spec:
   replicas: 1
   selector:
     matchLabels:
-      skies/group: infra
-      app: apisix
+      app: loki
   template:
     metadata:
       labels:
-        skies/group: infra
-        app: apisix
+        app: loki
     spec:
       nodeSelector:
-        skies/node-role: app
-      serviceAccountName: apisix
+        skies/node-role: infra
       containers:
-        - name: apisix
-          image: apache/apisix:3.14.1-debian
+        - name: loki
+          image: grafana/loki:3.2.0
           imagePullPolicy: IfNotPresent
+          args:
+            - -config.file=/etc/loki/loki-config.yaml
           ports:
-            - containerPort: 9080
+            - containerPort: 3100
               name: http
-            - containerPort: 9443
-              name: https
-            - containerPort: 9180
-              name: admin
-            - containerPort: 9100
-              name: stream-tcp
-          env:
-            - name: TZ
-              value: UTC
           volumeMounts:
-            - name: apisix-config
-              mountPath: /usr/local/apisix/conf/config.yaml
-              subPath: config.yaml
-          livenessProbe:
-            httpGet:
-              path: /apisix/admin/ping
-              port: 9180
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /apisix/admin/ping
-              port: 9180
-            initialDelaySeconds: 5
-            periodSeconds: 5
+            - name: loki-config
+              mountPath: /etc/loki/loki-config.yaml
+              subPath: loki-config.yaml
+            - name: loki-data
+              mountPath: /loki
           resources:
             requests:
               cpu: 100m
@@ -92,86 +95,36 @@ spec:
               cpu: 500m
               memory: 512Mi
       volumes:
-        - name: apisix-config
+        - name: loki-config
           configMap:
-            name: apisix-config
+            name: loki-config
+        - name: loki-data
+          emptyDir: {} # replace with local-pv later
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: apisix
+  name: loki
 spec:
   selector:
-    app: apisix
-  type: NodePort
+    app: loki
   ports:
-    - port: 9080
-      targetPort: 9080
-      nodePort: 31502
+    - name: http
+      port: 3100
+      targetPort: 3100
       protocol: TCP
-      name: http
-    - port: 9443
-      targetPort: 9443
-      nodePort: 31503
-      protocol: TCP
-      name: https
-    - port: 9180
-      targetPort: 9180
-      nodePort: 31504
-      protocol: TCP
-      name: admin
-    - port: 9100
-      targetPort: 9100
-      nodePort: 31505
-      protocol: TCP
-      name: stream-tcp
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: apisix
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: apisix
-rules:
-  - apiGroups: [""]
-    resources: ["services", "endpoints", "configmaps"]
-    verbs: ["get", "list", "watch"]
-  - apiGroups: [""]
-    resources: ["secrets"]
-    verbs: ["get"]
-  - apiGroups: ["apisix.apache.org"]
-    resources: ["apisixroutes", "apisixtlses", "apisixupstreams", "apisixclusterconfigs"]
-    verbs: ["get", "list", "watch"]
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: apisix
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: apisix
-subjects:
-  - kind: ServiceAccount
-    name: apisix
-    namespace: default
+  type: ClusterIP
 
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: apisix
+  name: loki
 spec:
   podSelector:
     matchLabels:
-      app: apisix
+      app: loki
   policyTypes:
     - Ingress
     - Egress
@@ -180,13 +133,7 @@ spec:
         - podSelector: {}
       ports:
         - protocol: TCP
-          port: 9080
-        - protocol: TCP
-          port: 9443
-        - protocol: TCP
-          port: 9180
-        - protocol: TCP
-          port: 9100
+          port: 3100
   egress:
     - to:
         - podSelector: {}
@@ -195,8 +142,3 @@ spec:
           port: 53
         - protocol: UDP
           port: 53
-    - to:
-        - namespaceSelector: {}
-      ports:
-        - protocol: TCP
-          port: 2379
