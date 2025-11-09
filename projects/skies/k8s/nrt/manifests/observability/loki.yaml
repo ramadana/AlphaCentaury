@@ -1,0 +1,199 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki-config
+  labels:
+    app: loki
+data:
+  loki-config.yaml: |
+    server:
+      http_listen_port: 3100
+      grpc_listen_port: 9095
+
+    auth_enabled: false
+
+    common:
+      instance_addr: 127.0.0.1
+      path_prefix: /loki
+      storage:
+        filesystem:
+          chunks_directory: /loki/chunks
+          rules_directory: /loki/rules
+      replication_factor: 1
+      ring:
+        kvstore:
+          store: inmemory
+
+    schema_config:
+      configs:
+        - from: 2020-10-24
+          store: boltdb-shipper
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: index_
+            period: 24h
+
+    storage_config:
+      boltdb_shipper:
+        active_index_directory: /loki/index
+        cache_location: /loki/cache
+      filesystem:
+        directory: /loki/chunks
+
+    compactor:
+      working_directory: /loki/compactor
+      compaction_interval: 10m
+      retention_enabled: true
+      retention_delete_delay: 2h
+      retention_delete_worker_count: 150
+      delete_request_store: filesystem
+
+    limits_config:
+      retention_period: 7d
+      reject_old_samples: true
+      reject_old_samples_max_age: 168h
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: loki-local-pv
+spec:
+  capacity:
+    storage: 30Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  local:
+    path: /mnt/data/loki
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: skies/node-role
+              operator: In
+              values:
+                - infra
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: loki-pvc
+  labels:
+    app: loki
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 30Gi
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: loki
+  labels:
+    app: loki
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: loki
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "nodes", "namespaces"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: loki
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: loki
+subjects:
+  - kind: ServiceAccount
+    name: loki
+    namespace: default
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loki
+  labels:
+    app: loki
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loki
+  template:
+    metadata:
+      labels:
+        app: loki
+    spec:
+      serviceAccountName: loki
+      nodeSelector:
+        skies/node-role: infra
+      containers:
+        - name: loki
+          image: grafana/loki:2.9.3
+          imagePullPolicy: IfNotPresent
+          args:
+            - -config.file=/etc/loki/loki-config.yaml
+          ports:
+            - containerPort: 3100
+              name: http
+            - containerPort: 9095
+              name: grpc
+          volumeMounts:
+            - name: loki-config
+              mountPath: /etc/loki
+            - name: loki-storage
+              mountPath: /loki
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+      volumes:
+        - name: loki-config
+          configMap:
+            name: loki-config
+        - name: loki-storage
+          persistentVolumeClaim:
+            claimName: loki-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki
+  labels:
+    app: loki
+spec:
+  selector:
+    app: loki
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3100
+      targetPort: 3100
+      protocol: TCP
+    - name: grpc
+      port: 9095
+      targetPort: 9095
+      protocol: TCP
