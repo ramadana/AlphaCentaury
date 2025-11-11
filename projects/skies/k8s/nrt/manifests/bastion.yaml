@@ -1,0 +1,218 @@
+---
+# PersistentVolume for Bastion SSH config
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: bastion-local-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  local:
+    path: /mnt/data/bastion
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: skies/node-role
+              operator: In
+              values:
+                - app
+
+---
+# PersistentVolumeClaim for Bastion
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bastion-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# ConfigMap for SSH configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bastion-config
+  namespace: default
+data:
+  sshd_config: |
+    Port 2222
+    Protocol 2
+    HostKey /config/ssh_host_rsa_key
+    HostKey /config/ssh_host_ecdsa_key
+    HostKey /config/ssh_host_ed25519_key
+    
+    # Authentication
+    PubkeyAuthentication yes
+    AuthorizedKeysFile /config/.ssh/authorized_keys
+    PasswordAuthentication no
+    PermitEmptyPasswords no
+    ChallengeResponseAuthentication no
+    
+    # Security
+    PermitRootLogin no
+    X11Forwarding no
+    AllowTcpForwarding yes
+    GatewayPorts no
+    PermitTunnel no
+    
+    # Logging
+    SyslogFacility AUTH
+    LogLevel INFO
+    
+    # Session
+    ClientAliveInterval 300
+    ClientAliveCountMax 2
+    MaxAuthTries 3
+    MaxSessions 10
+
+---
+# Deployment for Bastion
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bastion
+  namespace: default
+  labels:
+    app: bastion
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bastion
+  template:
+    metadata:
+      labels:
+        app: bastion
+    spec:
+      nodeSelector:
+        skies/node-role: app
+      containers:
+        - name: bastion
+          image: lscr.io/linuxserver/openssh-server:latest
+          ports:
+            - containerPort: 2222
+              name: ssh
+              protocol: TCP
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: TZ
+              value: "Asia/Tokyo"
+            - name: PUBLIC_KEY_FILE
+              value: "/config/.ssh/authorized_keys"
+            - name: SUDO_ACCESS
+              value: "false"
+            - name: PASSWORD_ACCESS
+              value: "false"
+            - name: USER_NAME
+              value: "bastion"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          volumeMounts:
+            - name: bastion-config
+              mountPath: /config
+            - name: sshd-config
+              mountPath: /etc/ssh/sshd_config
+              subPath: sshd_config
+          livenessProbe:
+            tcpSocket:
+              port: 2222
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: 2222
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        - name: bastion-config
+          persistentVolumeClaim:
+            claimName: bastion-pvc
+        - name: sshd-config
+          configMap:
+            name: bastion-config
+
+---
+# Service for Bastion
+apiVersion: v1
+kind: Service
+metadata:
+  name: bastion
+  namespace: default
+  labels:
+    app: bastion
+spec:
+  type: NodePort
+  ports:
+    - port: 2222
+      targetPort: 2222
+      nodePort: 31500
+      protocol: TCP
+      name: ssh
+  selector:
+    app: bastion
+
+---
+# NetworkPolicy to restrict access to bastion
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: bastion-ingress
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: bastion
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow SSH from your main bastion host only
+    - from:
+        - ipBlock:
+            cidr: 45.32.103.199/32
+      ports:
+        - protocol: TCP
+          port: 2222
+  egress:
+    # Allow bastion to reach PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow bastion to reach MongoDB (when deployed)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: mongodb
+      ports:
+        - protocol: TCP
+          port: 27017
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
