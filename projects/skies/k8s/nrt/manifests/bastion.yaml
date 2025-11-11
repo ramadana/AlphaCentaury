@@ -1,5 +1,3 @@
----
-# PersistentVolume for Bastion SSH config
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -22,7 +20,6 @@ spec:
                 - app
 
 ---
-# PersistentVolumeClaim for Bastion
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -37,7 +34,6 @@ spec:
       storage: 1Gi
 
 ---
-# ConfigMap for SSH configuration
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -76,7 +72,6 @@ data:
     MaxSessions 10
 
 ---
-# Deployment for Bastion
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -150,7 +145,6 @@ spec:
             name: bastion-config
 
 ---
-# Service for Bastion
 apiVersion: v1
 kind: Service
 metadata:
@@ -170,7 +164,6 @@ spec:
     app: bastion
 
 ---
-# NetworkPolicy to restrict access to bastion
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
