@@ -11,12 +11,14 @@ spec:
   template:
     metadata:
       labels:
+        app: postgres
         skies/group: db
+    spec:
       nodeSelector:
         skies/node-role: infra
       containers:
         - name: postgres
-          image: rapidfort/postgresql-official:17.6-alpine3.21
+          image: postgres:17-bookworm
           imagePullPolicy: IfNotPresent
           env:
             - name: POSTGRES_DB
