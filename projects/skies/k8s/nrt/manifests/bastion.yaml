@@ -105,8 +105,11 @@ spec:
               value: "1000"
             - name: TZ
               value: "Asia/Tokyo"
-            - name: PUBLIC_KEY_FILE
-              value: "/config/.ssh/authorized_keys"
+            - name: PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: bastion-ssh-keys
+                  key: authorized_keys
             - name: SUDO_ACCESS
               value: "false"
             - name: PASSWORD_ACCESS
