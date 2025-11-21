@@ -18,7 +18,7 @@ spec:
         skies/node-role: infra
       containers:
         - name: postgres
-          image: postgres:17-bookworm
+          image: postgres:18-trixie
           imagePullPolicy: IfNotPresent
           env:
             - name: POSTGRES_DB
@@ -37,7 +37,7 @@ spec:
             - containerPort: 5432
           volumeMounts:
             - name: postgres-storage
-              mountPath: /var/lib/postgresql/data
+              mountPath: /var/lib/postgresql
   volumeClaimTemplates:
     - metadata:
         name: postgres-storage
@@ -45,7 +45,7 @@ spec:
         accessModes: ["ReadWriteOnce"]
         resources:
           requests:
-            storage: 50Gi
+            storage: 35Gi
         storageClassName: local-path
 
 ---
@@ -55,7 +55,7 @@ metadata:
   name: postgres-local-pv
 spec:
   capacity:
-    storage: 50Gi
+    storage: 35Gi
   accessModes:
     - ReadWriteOnce
   storageClassName: local-path
