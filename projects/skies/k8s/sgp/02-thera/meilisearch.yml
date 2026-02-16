@@ -20,7 +20,7 @@ spec:
         node-role: thera
       containers:
         - name: meilisearch
-          image: getmeili/meilisearch:v1.24.0
+          image: getmeili/meilisearch:v1.32.2
           command: ["/bin/sh"]
           args:
             - "-c"

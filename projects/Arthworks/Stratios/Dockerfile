@@ -8,7 +8,8 @@ LABEL maintainer="Pramandha Arthadana <rama@rmdn.dev>" \
       version="1.0"
 
 RUN echo "Upgrading current packages ..." && \
-    apt update && apt upgrade -y
+    apt update && apt upgrade -y && \ 
+    apt install -y ca-certificates curl
 
 RUN echo "Installing Mongo Shell (mongosh) ..." && \
       curl -L -o /tmp/mongosh.tgz https://downloads.mongodb.com/compass/mongosh-2.5.9-linux-x64.tgz && \
@@ -20,32 +21,14 @@ RUN echo "Installing Mongo Shell (mongosh) ..." && \
 
 RUN echo "Installing PostgreSQL Client (postgresql-client) ..." && \
     apt install -y \
-    ca-certificates \
     postgresql-client
 
 RUN echo "Installing Other Essential Tools ..." && \
     apt install -y \
     openssh-server \
-    curl \
     nano \ 
     tar 
 
-# ---------------------------------------------------------
-# SSH server configuration
-# ---------------------------------------------------------
-RUN mkdir -p /run/sshd && \
-    ssh-keygen -A && \
-    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
-    echo "root:toor" | chpasswd && \
-    echo "Password authentication enabled for internal use only."
-
-# ---------------------------------------------------------
-# Expose SSH port
-# ---------------------------------------------------------
 EXPOSE 22
 
-# ---------------------------------------------------------
-# Set default command
-# ---------------------------------------------------------
 CMD ["/usr/sbin/sshd", "-D"]
-

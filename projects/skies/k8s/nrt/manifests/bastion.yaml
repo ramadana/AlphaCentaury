@@ -4,7 +4,7 @@ metadata:
   name: bastion-local-pv
 spec:
   capacity:
-    storage: 1Gi
+    storage: 11Gi
   accessModes:
     - ReadWriteOnce
   storageClassName: local-path
@@ -31,7 +31,7 @@ spec:
   storageClassName: local-path
   resources:
     requests:
-      storage: 1Gi
+      storage: 11Gi
 
 ---
 apiVersion: v1
@@ -121,8 +121,8 @@ spec:
               cpu: 50m
               memory: 64Mi
             limits:
-              cpu: 200m
-              memory: 128Mi
+              cpu: 500m
+              memory: 512Mi
           volumeMounts:
             - name: bastion-config
               mountPath: /config
