@@ -18,7 +18,7 @@ spec:
         skies/node-role: alikara
       containers:
         - name: postgres
-          image: postgres:18-trixie
+          image: nrt.vultrcr.com/skcr/postgres
           imagePullPolicy: IfNotPresent
           env:
             - name: POSTGRES_DB

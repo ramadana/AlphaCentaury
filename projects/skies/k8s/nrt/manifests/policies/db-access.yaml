@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-access-rules
+spec:
+  podSelector:
+    matchLabels:
+      tier: db
+      skies/group: db
+  ingress:
+    - from:
+      - ipBlock:
+          cidr: 45.32.103.199/32 # Stargate
+    - from:
+      - podSelector:
+          matchLabels:
+            tier: backend
+    - from:
+      - podSelector:
+          matchLabels:
+            app: bastion
+    - ports:
+      - protocol: TCP
+        port: 27017
+      - protocol: TCP
+        port: 31701
+        endPort: 31800
+  policyTypes:
+    - Ingress

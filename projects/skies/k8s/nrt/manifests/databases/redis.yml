@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+spec:
+  serviceName: "redis"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+        tier: db
+        skies/group: db
+    spec:
+      nodeSelector:
+        skies/node-role: alikara
+      containers:
+        - name: redis
+          image: nrt.vultrcr.com/skcr/redis
+          ports:
+            - containerPort: 6379
+          volumeMounts:
+            - name: redis-storage
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 12Gi
+        storageClassName: local-path
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: redis-local-pv
+spec:
+  capacity:
+    storage: 12Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  local:
+    path: /mnt/data/redis
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: skies/node-role
+              operator: In
+              values:
+                - alikara
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+spec:
+  selector:
+      app: redis
+  type: NodePort
+  ports:
+    - port: 6379
+      targetPort: 6379
+      nodePort: 31701
+      protocol: TCP
