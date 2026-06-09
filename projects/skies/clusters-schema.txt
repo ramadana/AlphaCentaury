@@ -1,0 +1,64 @@
+# Clusters
+
+skies-noc (Singapore, Observability + Utility Cluster)
+ |
+ |--> Arnon (2c/4gb)
+    |--> Nginx / APISIX Ingress Controller (standalone, no etcd)
+    |--> Loki
+    |--> Bastion Host (access from selected public keys, to other k8s clusters)
+|--> Yulai (2c/4gb,)
+    |--> Metabase
+    |--> Grafana
+    |--> PostgreSQL
+|--> Thera (2c/4gb)
+   |--> Prometheus
+   |--> Github Actions Runners
+
+
+skies-sgp (Singapore, Primary Cluster)
+ |
+ |--> Villore (2c/4gb)
+    |--> PostgreSQL
+    |--> *SKIES Backoffice Service (JDK + Maven, Debian 13)
+    |--> *SKIES Backoffice Report Service (JDK + Maven, Debian 13)
+ |--> Luminaire (4c/8gb)
+    |--> MongoDB
+    |--> Meilisearch
+    |--> *SKIES Main Service (Golang, Alpine Linux)
+    |--> *SKIES Auth Service (Golang, Alpine Linux)
+    |--> *SKIES Rewards Service (Golang, Alpine Linux)
+ |--> Dodixie (2c/4gb)
+    |--> APISIX Ingress Controller (standalone, no etcd)
+    |--> *Admin Panel (NodeJS 24, Alpine Linux)
+    |--> *Backoffice Web (NodeJS 18, Alpine Linux)
+    |--> *Rewards Web (NodeJS 24, Alpine Linux)
+    |--> *Support Web (NodeJS 24, Alpine Linux)
+
+
+skies-jpn (Tokyo, Japan, Backup Cluster)
+ |
+ |--> Sobaseki (2c/4gb)
+    |--> PostgreSQL
+    |--> *SKIES Backoffice Service (JDK + Maven, Debian 13)
+    |--> *SKIES Backoffice Report Service (JDK + Maven, Debian 13)
+ |--> Jita (4c/8gb)
+    |--> MongoDB
+    |--> Meilisearch
+    |--> *SKIES Main Service (Golang, Alpine Linux)
+    |--> *SKIES Auth Service (Golang, Alpine Linux)
+    |--> *SKIES Rewards Service (Golang, Alpine Linux)
+ |--> Perimeter (2c/4gb)
+    |--> APISIX Ingress Controller (standalone, no etcd)
+    |--> *Admin Panel (NodeJS 24, Alpine Linux)
+    |--> *Backoffice Web (NodeJS 18, Alpine Linux)
+    |--> *Rewards Web (NodeJS 24, Alpine Linux)
+    |--> *Support Web (NodeJS 24, Alpine Linux)
+
+
+# Notes
+1. Bastion host is placed only in Arnon to limit public access and help security audit. Primary use cases are for managing and debugging all resources in all clusters.
+2. Villore / Sobaseki: Yes, they are tight. But, we intentionally leave this condition this way until the resources there are slowed down, which then mark the need to be upgraded to 4c/8gb.
+3. Dodixie / Perimeter: These are also tight. But, the one that heavily used are Admin Panel and Backoffice Web. The other are seldomly accessed.
+4. Only Backoffice Web pods are using NodeJS 18. This is because the developer still not upgraded the application to newer VueJS. If we upgrade it to NodeJS 20++ the app will surely crashed.
+5. PostgreSQL on Yulai, is used only to serve Metabase, Grafana, also for Prometheus and Loki (if needed). It will not serve any services outside skies-noc cluster.
+6. Villore & Sobaseki are setted that way because the database and service are tightly related. For now they are deployed on the same node, but in the future, if needed we will also separate the DB and the service on dedicated node.
