@@ -118,16 +118,14 @@ resource "vultr_firewall_rule" "allow_https" {
   notes             = "HTTPS ingress (Arnon — Nginx/APISIX)"
 }
 
-resource "vultr_firewall_rule" "allow_ssh" {
-  for_each = toset(var.ssh_allowed_cidrs)
-
+resource "vultr_firewall_rule" "allow_bastion_ssh" {
   firewall_group_id = vultr_kubernetes.skies_noc.firewall_group_id
   protocol          = "tcp"
   ip_type           = "v4"
-  subnet            = split("/", each.value)[0]
-  subnet_size       = tonumber(split("/", each.value)[1])
-  port              = "22"
-  notes             = "SSH access for bastion host management (Arnon)"
+  subnet            = var.bastion_ssh_allowed_ip
+  subnet_size       = 32
+  port              = var.bastion_ssh_port
+  notes             = "Bastion SSH on Arnon — Stargate only"
 }
 
 resource "vultr_firewall_rule" "allow_nodeport_from_bastion" {

@@ -19,7 +19,7 @@ variable "region" {
 variable "kubernetes_version" {
   description = "Kubernetes version for the VKE cluster"
   type        = string
-  default     = "v1.34.1+1"
+  default     = "v1.36.1+1"
 }
 
 # ------------------------------------------------------------------------------
@@ -97,10 +97,16 @@ variable "node_pools" {
 # Firewall
 # ------------------------------------------------------------------------------
 
-variable "ssh_allowed_cidrs" {
-  description = "CIDR blocks allowed to SSH into nodes (bastion management on Arnon)"
-  type        = list(string)
-  default     = []
+variable "bastion_ssh_allowed_ip" {
+  description = "Source IP allowed to SSH into the bastion host on Arnon (Stargate)"
+  type        = string
+  default     = "10.40.112.3"
+}
+
+variable "bastion_ssh_port" {
+  description = "SSH port exposed by the bastion host on Arnon"
+  type        = string
+  default     = "44022"
 }
 
 variable "bastion_allowed_cidrs" {

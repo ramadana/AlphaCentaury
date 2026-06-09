@@ -84,7 +84,7 @@ Before applying, choose one path:
 |------|------|---------|
 | HTTP | 80 | Public ingress (Arnon) |
 | HTTPS | 443 | Public ingress (Arnon) |
-| SSH | 22 | Bastion node access — set `ssh_allowed_cidrs` |
+| Bastion SSH | 44022 | Arnon bastion — only from `10.40.112.3` (Stargate) |
 | NodePort range | 31501–31800 | Cross-cluster debugging — set `bastion_allowed_cidrs` |
 
 ## Files

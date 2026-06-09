@@ -26,8 +26,9 @@ vpc_v4_subnet_mask = 16
 # }
 
 # --- Firewall ---
-# Restrict SSH to your office/home IPs for bastion access on Arnon.
-# ssh_allowed_cidrs = ["203.0.113.10/32"]
+# Bastion on Arnon: SSH only from Stargate on a non-standard port.
+# bastion_ssh_allowed_ip = "10.40.112.3"
+# bastion_ssh_port       = "44022"
 
 # CIDRs allowed to reach NodePort services when debugging other clusters.
 # bastion_allowed_cidrs = ["10.41.0.0/16"]
