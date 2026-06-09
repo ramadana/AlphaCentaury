@@ -24,11 +24,3 @@ vpc_v4_subnet_mask = 16
 #   yulai = { plan = "vhp-2c-4gb-amd", quantity = 1 }
 #   thera = { plan = "vhp-2c-4gb-amd", quantity = 1 }
 # }
-
-# --- Firewall ---
-# Bastion on Arnon: SSH only from Stargate on a non-standard port.
-# bastion_ssh_allowed_ip = "10.40.112.3"
-# bastion_ssh_port       = "44022"
-
-# CIDRs allowed to reach NodePort services when debugging other clusters.
-# bastion_allowed_cidrs = ["10.41.0.0/16"]

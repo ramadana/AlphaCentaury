@@ -41,6 +41,28 @@ locals {
   }
 
   vpc_id = var.create_vpc ? vultr_vpc.skies_noc[0].id : var.vpc_id
+
+  # VKE firewall is deny-by-default; only these inbound TCP ports are permitted.
+  firewall_rules = {
+    http = {
+      port  = "80"
+      notes = "HTTP"
+    }
+    https = {
+      port  = "443"
+      notes = "HTTPS"
+    }
+    tcp_30422 = {
+      port  = "30422"
+      notes = "Custom SSH port to access bastion host"
+      cidr_blocks = ["10.40.112.3/32"]
+    }
+    tcp_31101 = {
+      port  = "31101"
+      notes = "Custom NodePort to manage PostgreSQL database"
+      cidr_blocks = ["10.40.112.3/32"]
+    }
+  }
 }
 
 # ------------------------------------------------------------------------------
@@ -95,47 +117,17 @@ resource "vultr_kubernetes_node_pools" "additional" {
 }
 
 # ------------------------------------------------------------------------------
-# Firewall
+# Firewall — deny all except explicit inbound TCP allows below
 # ------------------------------------------------------------------------------
 
-resource "vultr_firewall_rule" "allow_http" {
+resource "vultr_firewall_rule" "ingress" {
+  for_each = local.firewall_rules
+
   firewall_group_id = vultr_kubernetes.skies_noc.firewall_group_id
   protocol          = "tcp"
   ip_type           = "v4"
   subnet            = "0.0.0.0"
   subnet_size       = 0
-  port              = "80"
-  notes             = "HTTP ingress (Arnon — Nginx/APISIX)"
-}
-
-resource "vultr_firewall_rule" "allow_https" {
-  firewall_group_id = vultr_kubernetes.skies_noc.firewall_group_id
-  protocol          = "tcp"
-  ip_type           = "v4"
-  subnet            = "0.0.0.0"
-  subnet_size       = 0
-  port              = "443"
-  notes             = "HTTPS ingress (Arnon — Nginx/APISIX)"
-}
-
-resource "vultr_firewall_rule" "allow_bastion_ssh" {
-  firewall_group_id = vultr_kubernetes.skies_noc.firewall_group_id
-  protocol          = "tcp"
-  ip_type           = "v4"
-  subnet            = var.bastion_ssh_allowed_ip
-  subnet_size       = 32
-  port              = var.bastion_ssh_port
-  notes             = "Bastion SSH on Arnon — Stargate only"
-}
-
-resource "vultr_firewall_rule" "allow_nodeport_from_bastion" {
-  for_each = toset(var.bastion_allowed_cidrs)
-
-  firewall_group_id = vultr_kubernetes.skies_noc.firewall_group_id
-  protocol          = "tcp"
-  ip_type           = "v4"
-  subnet            = split("/", each.value)[0]
-  subnet_size       = tonumber(split("/", each.value)[1])
-  port              = var.nodeport_range
-  notes             = "NodePort range for cross-cluster debugging via bastion"
+  port              = each.value.port
+  notes             = each.value.notes
 }

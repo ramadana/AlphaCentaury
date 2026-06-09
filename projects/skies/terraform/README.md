@@ -80,12 +80,16 @@ Before applying, choose one path:
 
 ## Firewall
 
-| Rule | Port | Purpose |
-|------|------|---------|
-| HTTP | 80 | Public ingress (Arnon) |
-| HTTPS | 443 | Public ingress (Arnon) |
-| Bastion SSH | 44022 | Arnon bastion — only from `10.40.112.3` (Stargate) |
-| NodePort range | 31501–31800 | Cross-cluster debugging — set `bastion_allowed_cidrs` |
+VKE firewall is **deny-by-default**. Only these inbound TCP ports are allowed (from anywhere):
+
+| Port | Protocol |
+|------|----------|
+| 80 | HTTP |
+| 443 | HTTPS |
+| 30422 | TCP |
+| 31101 | TCP |
+
+All other inbound connections are dropped. Rules are defined in `main.tf` under `local.firewall_rules`.
 
 ## Files
 

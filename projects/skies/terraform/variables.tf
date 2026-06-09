@@ -92,31 +92,3 @@ variable "node_pools" {
     error_message = "node_pools must include an \"arnon\" entry (initial inline pool for ingress/bastion)."
   }
 }
-
-# ------------------------------------------------------------------------------
-# Firewall
-# ------------------------------------------------------------------------------
-
-variable "bastion_ssh_allowed_ip" {
-  description = "Source IP allowed to SSH into the bastion host on Arnon (Stargate)"
-  type        = string
-  default     = "10.40.112.3"
-}
-
-variable "bastion_ssh_port" {
-  description = "SSH port exposed by the bastion host on Arnon"
-  type        = string
-  default     = "44022"
-}
-
-variable "bastion_allowed_cidrs" {
-  description = "CIDR blocks allowed to reach NodePort services for cross-cluster debugging"
-  type        = list(string)
-  default     = []
-}
-
-variable "nodeport_range" {
-  description = "NodePort range opened to bastion_allowed_cidrs"
-  type        = string
-  default     = "31501:31800"
-}
