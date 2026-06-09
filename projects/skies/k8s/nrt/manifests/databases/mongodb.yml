@@ -1,66 +1,64 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: postgres
+  name: mongodb
 spec:
-  serviceName: "postgres"
+  serviceName: "mongodb"
   replicas: 1
   selector:
     matchLabels:
-      app: postgres
+      app: mongodb
   template:
     metadata:
       labels:
-        app: postgres
+        app: mongodb
+        tier: db
         skies/group: db
     spec:
       nodeSelector:
         skies/node-role: alikara
       containers:
-        - name: postgres
-          image: nrt.vultrcr.com/skcr/postgres
-          imagePullPolicy: IfNotPresent
+        - name: mongodb
+          image: nrt.vultrcr.com/skcr/mongodb
           env:
-            - name: POSTGRES_DB
-              value: skies_db
-            - name: POSTGRES_USER
+            - name: MONGO_INITDB_ROOT_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: postgres-secret
-                  key: POSTGRES_INITDB_POSTGRES_USER
-            - name: POSTGRES_PASSWORD
+                  name: mongodb-secret
+                  key: MONGO_INITDB_ROOT_USERNAME
+            - name: MONGO_INITDB_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-secret
-                  key: POSTGRES_INITDB_POSTGRES_PASSWORD
+                  name: mongodb-secret
+                  key: MONGO_INITDB_ROOT_PASSWORD
           ports:
-            - containerPort: 5432
+            - containerPort: 27017
           volumeMounts:
-            - name: postgres-storage
-              mountPath: /var/lib/postgresql
+            - name: mongo-storage
+              mountPath: /data/db
   volumeClaimTemplates:
     - metadata:
-        name: postgres-storage
+        name: mongo-storage
       spec:
         accessModes: ["ReadWriteOnce"]
         resources:
           requests:
-            storage: 35Gi
+            storage: 27Gi
         storageClassName: local-path
 
 ---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: postgres-local-pv
+  name: mongodb-local-pv
 spec:
   capacity:
-    storage: 35Gi
+    storage: 27Gi
   accessModes:
     - ReadWriteOnce
   storageClassName: local-path
   local:
-    path: /mnt/data/postgresql
+    path: /mnt/data/mongodb
   nodeAffinity:
     required:
       nodeSelectorTerms:
@@ -69,18 +67,18 @@ spec:
               operator: In
               values:
                 - alikara
-
+        
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: postgres
+  name: mongodb
 spec:
   selector:
-      app: postgres
+      app: mongodb
   type: NodePort
   ports:
-    - port: 5432
-      targetPort: 5432
-      nodePort: 31703
+    - port: 27017
+      targetPort: 27017
+      nodePort: 31702
       protocol: TCP

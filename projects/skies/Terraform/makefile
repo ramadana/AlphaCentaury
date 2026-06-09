@@ -1,6 +1,6 @@
 # Makefile for Skies Infrastructure
 
-.PHONY: help setup init plan apply destroy status clean kubeconfig connect-sgp connect-nrt
+.PHONY: help setup init plan apply destroy status clean kubeconfig connect-noc
 
 # Default target
 help: ## Show this help message
@@ -51,15 +51,9 @@ kubeconfig: ## Extract kubeconfig files
 	@chmod +x extract-kubeconfig.sh
 	@./extract-kubeconfig.sh
 
-connect-sgp: ## Connect to Singapore cluster
-	@echo "Connecting to Singapore cluster..."
-	@chmod +x connect-cluster.sh
-	@./connect-cluster.sh sgp
-
-connect-nrt: ## Connect to Tokyo cluster  
-	@echo "Connecting to Tokyo cluster..."
-	@chmod +x connect-cluster.sh
-	@./connect-cluster.sh nrt
+connect-noc: ## Connect to skies-noc cluster
+	@echo "Connecting to skies-noc cluster..."
+	@export KUBECONFIG="$(CURDIR)/../k8s/vke-skies-noc.yml" && kubectl cluster-info
 
 validate: ## Validate Terraform configuration
 	@echo "Validating Terraform configuration..."
@@ -91,15 +85,9 @@ docs: ## Generate documentation
 		echo "terraform-docs not installed. Install from: https://terraform-docs.io/"; \
 	fi
 
-ssh-stargate: ## SSH to Stargate bastion host
-	@echo "Connecting to Stargate bastion host..."
-	@STARGATE_IP=$$(terraform output -json singapore_vps_instances | jq -r '.stargate.main_ip'); \
-	ssh -i ~/.ssh/id_rsa core@$$STARGATE_IP
-
-ssh-ethernity: ## SSH to Ethernity GitHub runner host
-	@echo "Connecting to Ethernity GitHub runner host..."
-	@ETHERNITY_IP=$$(terraform output -json singapore_vps_instances | jq -r '.ethernity.main_ip'); \
-	ssh -i ~/.ssh/id_rsa core@$$ETHERNITY_IP
+kubeconfig-export: ## Write kubeconfig to k8s/vke-skies-noc.yml
+	@terraform output -raw kube_config > ../k8s/vke-skies-noc.yml
+	@echo "Kubeconfig written to ../k8s/vke-skies-noc.yml"
 
 backup-state: ## Backup Terraform state
 	@echo "Backing up Terraform state..."

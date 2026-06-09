@@ -1,161 +1,99 @@
-# Skies Infrastructure - Multi-Region Kubernetes on Vultr
+# SKIES NOC — Terraform (Vultr VKE)
 
-This Terraform project provisions a complete multi-region Kubernetes infrastructure on Vultr with Cloudflare load balancing.
+Provisions the **skies-noc** Kubernetes cluster in Singapore: observability, utility, and bastion workloads.
 
-## Architecture Overview
+See [clusters-schema.txt](../clusters-schema.txt) for the full multi-cluster plan. This module covers **skies-noc only**.
 
-### Regions
-- **Singapore (SGP)**: Primary cluster with bastion and CI/CD hosts
-- **Tokyo (NRT)**: Failover cluster
+## Cluster Layout
 
-### Node Layout (Per Cluster)
-- **Luminaire**: Monitoring stack (Grafana, Prometheus, Loki, Metabase)
-- **Thera**: Database workloads
-- **Jita**: Backend services and Kafka
-- **Umbra**: Frontend applications  
-- **Perimeter**: API Gateway (Apache APISIX)
+| Node Pool | Plan | Workloads |
+|-----------|------|-----------|
+| **arnon** | 2 vCPU / 4 GB | Nginx / APISIX ingress, Loki, Bastion |
+| **yulai** | 2 vCPU / 4 GB | Metabase, Grafana, PostgreSQL |
+| **thera** | 2 vCPU / 4 GB | Prometheus, GitHub Actions runners |
 
-### Additional Infrastructure
-- **Stargate** (SGP only): Bastion host for secure access
-- **Ethernity** (SGP only): GitHub self-hosted runners
-- **Cloudflare Load Balancer**: Global traffic distribution with health checks
-- **Vultr Container Registry**: `sgp.vultrcr.com/skies`
+**Estimated cost:** ~$72/month (3 × `vhp-2c-4gb-amd` nodes)
 
-## Quick Start
+## Prerequisites
 
-### 1. Prerequisites
 - Vultr API key
-- Cloudflare API token 
-- Domain configured in Cloudflare
-- SSH key pair
+- Vultr Object Storage credentials (for remote Terraform state)
+- `terraform` >= 1.0
 
-### 2. Setup
-```bash
-git clone <this-repo>
-cd skies-infrastructure
-chmod +x setup.sh
-./setup.sh
-```
+## Setup
 
-### 3. Configure
 ```bash
+cd Projects/SKIES/terraform
+
+# 1. Configure variables
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your values
+# Edit terraform.tfvars
+
+# 2. Set Object Storage credentials for remote state
+export AWS_ACCESS_KEY_ID="<vultr-object-storage-access-key>"
+export AWS_SECRET_ACCESS_KEY="<vultr-object-storage-secret-key>"
+
+# 3. Review before applying
+terraform init
+terraform plan
 ```
 
-### 4. Deploy
+## Apply (when ready)
+
 ```bash
-terraform plan
 terraform apply
 ```
 
-### 5. Connect to Clusters
+After apply, extract kubeconfig:
+
 ```bash
-./extract-kubeconfig.sh
-./connect-cluster.sh sgp  # Singapore
-./connect-cluster.sh nrt  # Tokyo
+terraform output -raw kube_config > ../k8s/vke-skies-noc.yml
 ```
 
-## Project Structure
+## State
+
+Remote state is stored at:
 
 ```
-.
-├── main.tf                 # Main Terraform configuration
-├── variables.tf            # Variable definitions
-├── outputs.tf             # Output values
-├── terraform.tfvars.example
-├── modules/
-│   ├── region/            # VKE cluster and VPS module
-│   │   ├── main.tf
-│   │   ├── variables.tf
-│   │   ├── outputs.tf
-│   │   └── templates/
-│   │       └── cloud-init.yml
-│   └── cloudflare/        # Load balancer module
-│       ├── main.tf
-│       ├── variables.tf
-│       └── outputs.tf
-├── setup.sh              # Automated setup script
-├── extract-kubeconfig.sh # Extract cluster configs
-├── connect-cluster.sh    # Connect to specific cluster
-├── status.sh            # Check deployment status
-├── DEPLOYMENT_GUIDE.md  # Detailed deployment guide
-└── README.md           # This file
+s3://skies-infra/terraform/skies-noc.tfstate
 ```
 
-## Resource Specifications
+This replaces the previous `skies-nrt.tfstate` key. If you have existing NRT state, it is left untouched in Object Storage but no longer referenced by this configuration.
 
-### Default Node Sizes
-- **Luminaire**: 2 vCPU, 4GB RAM (monitoring)
-- **Thera**: 4 vCPU, 8GB RAM (databases) 
-- **Jita**: 4 vCPU, 8GB RAM (backends + Kafka)
-- **Umbra**: 2 vCPU, 4GB RAM (frontends)
-- **Perimeter**: 2 vCPU, 4GB RAM (API gateway)
+## VPC Options
 
-### VPS Instances
-- **Stargate**: 1 vCPU, 2GB RAM (bastion)
-- **Ethernity**: 4 vCPU, 8GB RAM (GitHub runners)
+| Mode | Setting |
+|------|---------|
+| Create new VPC | `create_vpc = true` (default) |
+| Use existing VPC | `create_vpc = false` + `vpc_id = "..."` |
 
-All instances use **Flatcar Container Linux** as the operating system.
+Default new VPC subnet: `10.41.0.0/16` — adjust `vpc_v4_subnet` if it overlaps with existing SKIES VPCs (e.g. `10.40.112.0/24` used elsewhere).
 
-## Helper Scripts
+## Existing Cluster Warning
 
-- **setup.sh**: Automated environment setup
-- **extract-kubeconfig.sh**: Extract cluster configs after deployment  
-- **connect-cluster.sh**: Switch between clusters
-- **status.sh**: Check infrastructure status
+A skies-noc VKE cluster may already exist (see `k8s/vke-skies-noc.yml`). Running `terraform apply` on a **new** state file will attempt to **create a second cluster**.
 
-## Key Features
+Before applying, choose one path:
 
-- ✅ Multi-region deployment (Singapore + Tokyo)
-- ✅ Automated failover with Cloudflare Load Balancer
-- ✅ Dedicated node pools for workload isolation
-- ✅ Bastion host for secure access
-- ✅ Self-hosted GitHub runners
-- ✅ Container registry integration
-- ✅ Infrastructure as Code with Terraform
-- ✅ Comprehensive monitoring setup ready
+1. **Fresh cluster** — destroy the old cluster manually in Vultr, then apply
+2. **Import existing** — import the existing cluster and node pools into this state (contact before doing this)
 
-## Cost Estimation
+## Firewall
 
-Based on default configurations:
-- **Singapore**: ~$200-250/month (5 nodes + 2 VPS)
-- **Tokyo**: ~$150-200/month (5 nodes)
-- **Total**: ~$350-450/month
+| Rule | Port | Purpose |
+|------|------|---------|
+| HTTP | 80 | Public ingress (Arnon) |
+| HTTPS | 443 | Public ingress (Arnon) |
+| SSH | 22 | Bastion node access — set `ssh_allowed_cidrs` |
+| NodePort range | 31501–31800 | Cross-cluster debugging — set `bastion_allowed_cidrs` |
 
-*Prices may vary based on Vultr pricing and actual usage*
+## Files
 
-## Security
-
-- SSH key-based authentication only
-- Firewall rules for essential ports
-- Private networking where possible
-- Bastion host for secure cluster access
-
-## Monitoring & Observability
-
-The **Luminaire** nodes are pre-configured to host:
-- **Grafana**: Dashboards and visualization
-- **Prometheus**: Metrics collection
-- **Loki**: Log aggregation  
-- **Metabase**: Business intelligence
-
-## Support
-
-For detailed deployment instructions, see [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md).
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
----
-
-**Made for the Skies project** 🚀
+```
+terraform/
+├── main.tf                  # Cluster, node pools, firewall
+├── variables.tf             # Input variables
+├── outputs.tf               # Cluster outputs
+├── terraform.tfvars.example # Template (copy to terraform.tfvars)
+└── README.md                # This file
+```

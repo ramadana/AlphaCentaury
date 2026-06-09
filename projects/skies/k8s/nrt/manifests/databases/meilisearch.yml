@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: meilisearch
-  namespace: skies
 spec:
   serviceName: "meilisearch"
   replicas: 1
@@ -17,10 +16,10 @@ spec:
         skies/group: db
     spec:
       nodeSelector:
-        node-role: thera
+        skies/node-role: alikara
       containers:
         - name: meilisearch
-          image: getmeili/meilisearch:v1.32.2
+          image: nrt.vultrcr.com/skcr/meilisearch
           command: ["/bin/sh"]
           args:
             - "-c"
@@ -46,17 +45,17 @@ spec:
         accessModes: ["ReadWriteOnce"]
         resources:
           requests:
-            storage: 15Gi
+            storage: 20Gi
         storageClassName: local-path
 
 ---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: meilisearch-local-pv-1
+  name: meilisearch-local-pv
 spec:
   capacity:
-    storage: 15Gi
+    storage: 20Gi
   accessModes:
     - ReadWriteOnce
   storageClassName: local-path
@@ -66,17 +65,16 @@ spec:
     required:
       nodeSelectorTerms:
         - matchExpressions:
-            - key: node-role
+            - key: skies/node-role
               operator: In
               values:
-                - thera
+                - alikara
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: meilisearch
-  namespace: skies
 spec:
   selector:
       app: meilisearch
@@ -92,8 +90,8 @@ spec:
 # args:
 #   - "-c"
 #   - |
-#     curl -o /meili_data/dumps/latest.dump "https://sgp1.vultrobjects.com/skies-backups/meilisearch/20250727-083804983.dump?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=Y9IRNULPFJGOZAOQO5O2%2F20251031%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20251031T193844Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=b80c8396e9921c40f2b46890f4047586f294f99dbc9441fec028e3e63b31a2ec" && \
+#     curl -o /meili_data/dumps/latest.dump "https://sgp1.vultrobjects.com/skies-backups/meilisearch/20260222-165613107.dump?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=Y9IRNULPFJGOZAOQO5O2%2F20260222%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260222T195418Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=80a104cd2f878c93d5d7b8657425f7c21fa50a17f9a86df6b7f44fd81bb7ca6d" && \
 #     meilisearch \
 #       --env production \
 #       --master-key "$MEILISEARCH_MASTER_KEY" \
-#       --import-dump /meili_data/dumps/latest.dump 20250731-075123672.dump
+#       --import-dump /meili_data/dumps/latest.dump
