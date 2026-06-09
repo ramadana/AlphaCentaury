@@ -1,0 +1,33 @@
+# Copy to terraform.tfvars and fill in your values.
+# terraform.tfvars is gitignored.
+
+vultr_api_key      = "your-vultr-api-key"
+environment        = "production"
+region             = "sgp"
+kubernetes_version = "v1.34.1+1"
+
+# --- VPC ---
+# Option A: create a new VPC (default)
+create_vpc         = true
+vpc_description    = "SKIES NOC observability cluster VPC (Singapore)"
+vpc_v4_subnet      = "10.41.0.0"
+vpc_v4_subnet_mask = 16
+
+# Option B: attach to an existing VPC instead
+# create_vpc = false
+# vpc_id     = "your-existing-vpc-uuid"
+
+# --- Node pools (clusters-schema.txt) ---
+# All three pools are 2c/4gb per the current plan.
+# node_pools = {
+#   arnon = { plan = "vhp-2c-4gb-amd", quantity = 1 }
+#   yulai = { plan = "vhp-2c-4gb-amd", quantity = 1 }
+#   thera = { plan = "vhp-2c-4gb-amd", quantity = 1 }
+# }
+
+# --- Firewall ---
+# Restrict SSH to your office/home IPs for bastion access on Arnon.
+# ssh_allowed_cidrs = ["203.0.113.10/32"]
+
+# CIDRs allowed to reach NodePort services when debugging other clusters.
+# bastion_allowed_cidrs = ["10.41.0.0/16"]
