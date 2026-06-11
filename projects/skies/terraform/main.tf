@@ -9,7 +9,9 @@ terraform {
   }
 
   backend "s3" {
-    endpoint = "https://sgp1.vultrobjects.com"
+    endpoints = {
+      s3 = "https://sgp1.vultrobjects.com"
+    }
     bucket   = "skies-infra"
     key      = "terraform/skies-noc.tfstate"
     region   = "sgp"
@@ -19,7 +21,7 @@ terraform {
     skip_metadata_api_check     = true
     skip_region_validation      = true
     skip_requesting_account_id  = true
-    force_path_style            = true
+    use_path_style              = true
 
     # Provide credentials via environment variables before running terraform:
     #   export AWS_ACCESS_KEY_ID="<vultr-object-storage-access-key>"
