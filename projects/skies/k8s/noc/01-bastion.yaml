@@ -1,0 +1,248 @@
+# ============================================================
+# skies-noc: Bastion Host on Arnon (Metamorphosis)
+# Image spec: Projects/Arthworks/Metamorphosis/Dockerfile
+#
+# Prerequisite — create the SSH secret before applying:
+#   kubectl create secret generic noc-bastion-secret \
+#     --from-file=authorized_keys=/path/to/authorized_keys
+# ============================================================
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: noc-bastion-pv
+spec:
+  capacity:
+    storage: 11Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-path
+  local:
+    path: /mnt/data/bastion
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: skies/node-role
+              operator: In
+              values:
+                - arnon
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: noc-bastion-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 11Gi
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: noc-bastion-sshd
+  namespace: default
+data:
+  sshd_config: |
+    Port 22
+    Protocol 2
+    HostKey /data/ssh/ssh_host_ed25519_key
+    HostKey /data/ssh/ssh_host_rsa_key
+
+    PubkeyAuthentication yes
+    AuthorizedKeysFile /home/bastion/.ssh/authorized_keys
+    PasswordAuthentication no
+    PermitEmptyPasswords no
+    KbdInteractiveAuthentication no
+    ChallengeResponseAuthentication no
+
+    PermitRootLogin no
+    X11Forwarding no
+    AllowTcpForwarding yes
+    GatewayPorts no
+    PermitTunnel yes
+
+    ClientAliveInterval 300
+    ClientAliveCountMax 2
+    MaxAuthTries 3
+    MaxSessions 10
+    LogLevel INFO
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: noc-bastion-startup
+  namespace: default
+data:
+  start.sh: |
+    #!/bin/sh
+    set -e
+
+    mkdir -p /data/ssh /home/bastion/.ssh
+    chmod 700 /home/bastion/.ssh
+
+    if [ ! -f /data/ssh/ssh_host_ed25519_key ]; then
+      echo "Generating SSH host keys..."
+      ssh-keygen -t ed25519 -f /data/ssh/ssh_host_ed25519_key -N ""
+      ssh-keygen -t rsa -b 4096 -f /data/ssh/ssh_host_rsa_key -N ""
+    fi
+
+    id bastion >/dev/null 2>&1 || adduser -D -h /home/bastion -s /bin/sh bastion
+
+    cp /secrets/authorized_keys /home/bastion/.ssh/authorized_keys
+    chown -R bastion:bastion /home/bastion/.ssh
+    chmod 600 /home/bastion/.ssh/authorized_keys
+
+    exec /usr/sbin/sshd -D -f /etc/ssh/sshd_config -e
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: noc-bastion
+  namespace: default
+  labels:
+    app: noc-bastion
+    skies/node-role: arnon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: noc-bastion
+  template:
+    metadata:
+      labels:
+        app: noc-bastion
+        skies/group: noc-utility
+    spec:
+      nodeSelector:
+        skies/node-role: arnon
+      containers:
+        - name: bastion
+          image: sgp.vultrcr.com/skcr/metamorphosis:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "/scripts/start.sh"]
+          ports:
+            - containerPort: 22
+              name: ssh
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          volumeMounts:
+            - name: bastion-data
+              mountPath: /data
+            - name: sshd-config
+              mountPath: /etc/ssh/sshd_config
+              subPath: sshd_config
+            - name: startup-script
+              mountPath: /scripts/start.sh
+              subPath: start.sh
+            - name: ssh-keys
+              mountPath: /secrets
+              readOnly: true
+          livenessProbe:
+            tcpSocket:
+              port: 22
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: 22
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: bastion-data
+          persistentVolumeClaim:
+            claimName: noc-bastion-pvc
+        - name: sshd-config
+          configMap:
+            name: noc-bastion-sshd
+        - name: startup-script
+          configMap:
+            name: noc-bastion-startup
+            defaultMode: 0755
+        - name: ssh-keys
+          secret:
+            secretName: noc-bastion-secret
+            items:
+              - key: authorized_keys
+                path: authorized_keys
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: noc-bastion
+  namespace: default
+  labels:
+    app: noc-bastion
+spec:
+  type: NodePort
+  selector:
+    app: noc-bastion
+  ports:
+    - name: ssh
+      port: 22
+      targetPort: 22
+      nodePort: 30422
+      protocol: TCP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: noc-bastion-access
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: noc-bastion
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # SSH from Stargate only (VPC internal)
+    - from:
+        - ipBlock:
+            cidr: 10.40.112.3/32
+      ports:
+        - protocol: TCP
+          port: 22
+  egress:
+    # NOC PostgreSQL on Yulai
+    - to:
+        - podSelector:
+            matchLabels:
+              app: noc-postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Cross-cluster debugging (private networks)
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/8
+    - to:
+        - ipBlock:
+            cidr: 172.16.0.0/12

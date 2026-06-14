@@ -1,0 +1,182 @@
+# ============================================================
+# skies-noc: PostgreSQL on Yulai
+# Serves: Grafana, Metabase (NOC internal only)
+# ============================================================
+
+---
+# Secret for PostgreSQL credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: noc-postgres-secret
+  namespace: default
+type: Opaque
+stringData:
+  POSTGRES_USER: noc_admin
+  POSTGRES_PASSWORD: "2518A5-1B4E3#7772E4409679C4BF2091B2E892ED73B1EDD0119B4-A1314F31C.C57"
+  GRAFANA_DB: grafana_db
+  GRAFANA_USER: grafana_user
+  GRAFANA_PASSWORD: "6B893ED4159.A8C64BE9E42E5A4315222-B32E9992AD+62007592B92F7AC0.131CE0"
+  METABASE_DB: metabase_db
+  METABASE_USER: metabase_user
+  METABASE_PASSWORD: "36CA9C84.CCA5172BA885D4FAB0529B-49976F663F8A1639-B9597DB4C7.B9184C29"
+
+---
+# PersistentVolume for PostgreSQL
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: noc-postgres-pv
+spec:
+  capacity:
+    storage: 25Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-path
+  local:
+    path: /mnt/data/postgresql
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: skies/node-role
+              operator: In
+              values:
+                - yulai
+
+---
+# PersistentVolumeClaim for PostgreSQL
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: noc-postgres-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 25Gi
+
+---
+# ConfigMap for PostgreSQL init scripts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: noc-postgres-init
+  namespace: default
+data:
+  init.sql: |
+    -- Create Grafana database and user
+    CREATE DATABASE grafana_db;
+    CREATE USER grafana_user WITH ENCRYPTED PASSWORD '<grafana-db-password-here>';
+    GRANT ALL PRIVILEGES ON DATABASE grafana_db TO grafana_user;
+
+    -- Create Metabase database and user
+    CREATE DATABASE metabase_db;
+    CREATE USER metabase_user WITH ENCRYPTED PASSWORD '<metabase-db-password-here>';
+    GRANT ALL PRIVILEGES ON DATABASE metabase_db TO metabase_user;
+
+---
+# StatefulSet for PostgreSQL
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: noc-postgres
+  namespace: default
+  labels:
+    app: noc-postgres
+    skies/node-role: yulai
+spec:
+  serviceName: noc-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: noc-postgres
+  template:
+    metadata:
+      labels:
+        app: noc-postgres
+        skies/group: noc-db
+    spec:
+      nodeSelector:
+        skies/node-role: yulai
+      containers:
+        - name: postgres
+          image: nrt.vultrcr.com/skcr/postgres
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+              name: postgres
+              protocol: TCP
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: noc-postgres-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: noc-postgres-secret
+                  key: POSTGRES_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/18/data/pgdata
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/18/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - noc_admin
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - noc_admin
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: noc-postgres-pvc
+        - name: init-scripts
+          configMap:
+            name: noc-postgres-init
+
+---
+# Service for PostgreSQL (ClusterIP - internal only)
+apiVersion: v1
+kind: Service
+metadata:
+  name: noc-postgres
+  namespace: default
+  labels:
+    app: noc-postgres
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+      name: postgres
+  selector:
+    app: noc-postgres

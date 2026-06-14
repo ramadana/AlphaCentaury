@@ -1,0 +1,156 @@
+# ============================================================
+# skies-noc: Directory Initialization DaemonSet
+# Creates required storage directories on each node
+# DELETE this DaemonSet after directories are created!
+# ============================================================
+
+---
+# Arnon Node - Directory Initializer
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: init-dirs-arnon
+  namespace: default
+  labels:
+    app: init-dirs
+    skies/node-role: arnon
+spec:
+  selector:
+    matchLabels:
+      app: init-dirs-arnon
+  template:
+    metadata:
+      labels:
+        app: init-dirs-arnon
+    spec:
+      nodeSelector:
+        skies/node-role: arnon
+      initContainers:
+        - name: create-dirs
+          image: busybox:latest
+          command:
+            - sh
+            - -c
+            - |
+              echo "Creating directories on Arnon node..."
+              mkdir -p /host/mnt/data/loki
+              mkdir -p /host/mnt/data/bastion
+              mkdir -p /host/mnt/data/traefik
+              chmod -R 755 /host/mnt/data
+              echo "=== Arnon directories created ==="
+              ls -la /host/mnt/data/
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
+      containers:
+        - name: pause
+          image: busybox:latest
+          command: ["sh", "-c", "echo Arnon dirs ready && sleep infinity"]
+      volumes:
+        - name: host-root
+          hostPath:
+            path: /
+      tolerations:
+        - operator: Exists
+
+---
+# Yulai Node - Directory Initializer
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: init-dirs-yulai
+  namespace: default
+  labels:
+    app: init-dirs
+    skies/node-role: yulai
+spec:
+  selector:
+    matchLabels:
+      app: init-dirs-yulai
+  template:
+    metadata:
+      labels:
+        app: init-dirs-yulai
+    spec:
+      nodeSelector:
+        skies/node-role: yulai
+      initContainers:
+        - name: create-dirs
+          image: busybox:latest
+          command:
+            - sh
+            - -c
+            - |
+              echo "Creating directories on Yulai node..."
+              mkdir -p /host/mnt/data/postgresql
+              mkdir -p /host/mnt/data/grafana
+              mkdir -p /host/mnt/data/metabase
+              chmod -R 755 /host/mnt/data
+              echo "=== Yulai directories created ==="
+              ls -la /host/mnt/data/
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
+      containers:
+        - name: pause
+          image: busybox:latest
+          command: ["sh", "-c", "echo Yulai dirs ready && sleep infinity"]
+      volumes:
+        - name: host-root
+          hostPath:
+            path: /
+      tolerations:
+        - operator: Exists
+
+---
+# Thera Node - Directory Initializer
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: init-dirs-thera
+  namespace: default
+  labels:
+    app: init-dirs
+    skies/node-role: thera
+spec:
+  selector:
+    matchLabels:
+      app: init-dirs-thera
+  template:
+    metadata:
+      labels:
+        app: init-dirs-thera
+    spec:
+      nodeSelector:
+        skies/node-role: thera
+      initContainers:
+        - name: create-dirs
+          image: busybox:latest
+          command:
+            - sh
+            - -c
+            - |
+              echo "Creating directories on Thera node..."
+              mkdir -p /host/mnt/data/prometheus
+              chmod -R 755 /host/mnt/data
+              echo "=== Thera directories created ==="
+              ls -la /host/mnt/data/
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
+      containers:
+        - name: pause
+          image: busybox:latest
+          command: ["sh", "-c", "echo Thera dirs ready && sleep infinity"]
+      volumes:
+        - name: host-root
+          hostPath:
+            path: /
+      tolerations:
+        - operator: Exists
