@@ -1,0 +1,220 @@
+# ============================================================
+# skies-noc: Loki on Arnon
+# Image: nrt.vultrcr.com/skcr/loki (DHI Loki 3.7.x, Debian 13)
+#   https://hub.docker.com/hardened-images/catalog/dhi/loki
+# Storage: 10Gi local PV, 90-day retention
+# Consumers: Grafana (Phase 7, internal ClusterIP)
+# ============================================================
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: noc-loki-config
+  namespace: default
+data:
+  loki-config.yaml: |
+    auth_enabled: false
+
+    server:
+      http_listen_port: 3100
+      grpc_listen_port: 9095
+      log_level: info
+
+    common:
+      path_prefix: /loki
+      replication_factor: 1
+      ring:
+        instance_addr: 127.0.0.1
+        kvstore:
+          store: inmemory
+
+    schema_config:
+      configs:
+        - from: 2024-01-01
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: index_
+            period: 24h
+
+    storage_config:
+      filesystem:
+        directory: /loki/chunks
+      tsdb_shipper:
+        active_index_directory: /loki/tsdb-index
+        cache_location: /loki/tsdb-cache
+
+    compactor:
+      working_directory: /loki/compactor
+      compaction_interval: 10m
+      retention_enabled: true
+      retention_delete_delay: 2h
+      retention_delete_worker_count: 150
+      delete_request_store: filesystem
+
+    limits_config:
+      retention_period: 2160h
+      reject_old_samples: true
+      reject_old_samples_max_age: 2160h
+      max_query_length: 2160h
+      max_query_lookback: 2160h
+      ingestion_rate_mb: 8
+      ingestion_burst_size_mb: 16
+
+    analytics:
+      reporting_enabled: false
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: noc-loki-pv
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-path
+  local:
+    path: /mnt/data/loki
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: skies/node-role
+              operator: In
+              values:
+                - arnon
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: noc-loki-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: noc-loki
+  namespace: default
+  labels:
+    app: noc-loki
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: noc-loki
+  namespace: default
+  labels:
+    app: noc-loki
+    skies/node-role: arnon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: noc-loki
+  template:
+    metadata:
+      labels:
+        app: noc-loki
+        skies/group: noc-observability
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3100"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: noc-loki
+      nodeSelector:
+        skies/node-role: arnon
+      securityContext:
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        runAsNonRoot: true
+      containers:
+        - name: loki
+          image: nrt.vultrcr.com/skcr/loki
+          imagePullPolicy: Always
+          args:
+            - -config.file=/etc/loki/loki-config.yaml
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - containerPort: 3100
+              name: http
+              protocol: TCP
+            - containerPort: 9095
+              name: grpc
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: loki-config
+              mountPath: /etc/loki
+            - name: loki-storage
+              mountPath: /loki
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+      volumes:
+        - name: loki-config
+          configMap:
+            name: noc-loki-config
+        - name: loki-storage
+          persistentVolumeClaim:
+            claimName: noc-loki-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: noc-loki
+  namespace: default
+  labels:
+    app: noc-loki
+spec:
+  type: ClusterIP
+  selector:
+    app: noc-loki
+  ports:
+    - name: http
+      port: 3100
+      targetPort: http
+      protocol: TCP
+    - name: grpc
+      port: 9095
+      targetPort: grpc
+      protocol: TCP
