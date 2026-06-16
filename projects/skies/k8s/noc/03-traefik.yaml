@@ -1,29 +1,33 @@
 # ============================================================
-# skies-noc: Traefik v3.2 on Arnon
-# Exposes: Grafana (stats.samuraikurobushi.co.id)
-#          Metabase (analytics.samuraikurobushi.co.id)
+# skies-noc: Traefik on Arnon
+# Exposes: Grafana (monitor.skies.rmdn.dev)
+#          Metabase (analytics.skies.rmdn.dev)
 # ============================================================
 
 ---
-# ServiceAccount for Traefik
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: traefik
+  name: noc-traefik
   namespace: default
 
 ---
-# ClusterRole for Traefik
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: traefik
+  name: noc-traefik
 rules:
   - apiGroups: [""]
     resources:
       - services
       - endpoints
       - secrets
+      - configmaps
+      - nodes
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources:
+      - endpointslices
     verbs: ["get", "list", "watch"]
   - apiGroups: ["extensions", "networking.k8s.io"]
     resources:
@@ -34,37 +38,22 @@ rules:
     resources:
       - ingresses/status
     verbs: ["update"]
-  - apiGroups: ["traefik.io"]
-    resources:
-      - middlewares
-      - middlewaretcps
-      - ingressroutes
-      - traefikservices
-      - ingressroutetcps
-      - ingressrouteudps
-      - tlsoptions
-      - tlsstores
-      - serverstransports
-      - serverstransporttcps
-    verbs: ["get", "list", "watch"]
 
 ---
-# ClusterRoleBinding for Traefik
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: traefik
+  name: noc-traefik
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: traefik
+  name: noc-traefik
 subjects:
   - kind: ServiceAccount
-    name: traefik
+    name: noc-traefik
     namespace: default
 
 ---
-# PersistentVolume for Traefik (SSL certs)
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -88,7 +77,6 @@ spec:
                 - arnon
 
 ---
-# PersistentVolumeClaim for Traefik
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -103,11 +91,10 @@ spec:
       storage: 1Gi
 
 ---
-# ConfigMap for Traefik static config
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: traefik-config
+  name: noc-traefik-config
   namespace: default
 data:
   traefik.yaml: |
@@ -115,11 +102,21 @@ data:
       checkNewVersion: false
       sendAnonymousUsage: false
 
-    # Entry points
+    ping:
+      entryPoint: traefik
+
     entryPoints:
       web:
         address: ":80"
         http:
+          encodedCharacters:
+            allowEncodedSlash: false
+            allowEncodedBackSlash: false
+            allowEncodedNullCharacter: false
+            allowEncodedSemicolon: false
+            allowEncodedPercent: false
+            allowEncodedQuestionMark: false
+            allowEncodedHash: false
           redirections:
             entryPoint:
               to: websecure
@@ -128,24 +125,27 @@ data:
       websecure:
         address: ":443"
         http:
+          encodedCharacters:
+            allowEncodedSlash: false
+            allowEncodedBackSlash: false
+            allowEncodedNullCharacter: false
+            allowEncodedSemicolon: false
+            allowEncodedPercent: false
+            allowEncodedQuestionMark: false
+            allowEncodedHash: false
           tls:
             certResolver: letsencrypt
       traefik:
         address: ":9000"
 
-    # API and Dashboard
     api:
       dashboard: true
       insecure: false
 
-    # Providers
     providers:
       kubernetesIngress:
-        ingressClass: traefik
-      kubernetesCRD:
-        allowCrossNamespace: false
+        ingressClass: noc-traefik
 
-    # Let's Encrypt
     certificatesResolvers:
       letsencrypt:
         acme:
@@ -154,15 +154,12 @@ data:
           httpChallenge:
             entryPoint: web
 
-    # Logging
     log:
       level: INFO
 
-    # Access logs
     accessLog:
       bufferingSize: 100
 
-    # Prometheus metrics
     metrics:
       prometheus:
         entryPoint: traefik
@@ -171,33 +168,32 @@ data:
         addRoutersLabels: true
 
 ---
-# Deployment for Traefik
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: traefik
+  name: noc-traefik
   namespace: default
   labels:
-    app: traefik
+    app: noc-traefik
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: traefik
+      app: noc-traefik
   template:
     metadata:
       labels:
-        app: traefik
+        app: noc-traefik
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9000"
         prometheus.io/path: "/metrics"
     spec:
-      serviceAccountName: traefik
+      serviceAccountName: noc-traefik
       nodeSelector:
         skies/node-role: arnon
       containers:
-        - name: traefik
+        - name: noc-traefik
           image: nrt.vultrcr.com/skcr/traefik
           imagePullPolicy: Always
           args:
@@ -229,32 +225,31 @@ spec:
           livenessProbe:
             httpGet:
               path: /ping
-              port: 9000
+              port: traefik
             initialDelaySeconds: 10
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /ping
-              port: 9000
+              port: traefik
             initialDelaySeconds: 5
             periodSeconds: 5
       volumes:
         - name: traefik-config
           configMap:
-            name: traefik-config
+            name: noc-traefik-config
         - name: traefik-data
           persistentVolumeClaim:
             claimName: noc-traefik-pvc
 
 ---
-# Service for Traefik
 apiVersion: v1
 kind: Service
 metadata:
-  name: traefik
+  name: noc-traefik
   namespace: default
   labels:
-    app: traefik
+    app: noc-traefik
 spec:
   type: ClusterIP
   ports:
@@ -268,21 +263,19 @@ spec:
       port: 9000
       targetPort: 9000
   selector:
-    app: traefik
+    app: noc-traefik
 
 ---
-# IngressClass for Traefik
 apiVersion: networking.k8s.io/v1
 kind: IngressClass
 metadata:
-  name: traefik
+  name: noc-traefik
   annotations:
     ingressclass.kubernetes.io/is-default-class: "true"
 spec:
   controller: traefik.io/ingress-controller
 
 ---
-# Ingress for Grafana
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -293,7 +286,7 @@ metadata:
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
 spec:
-  ingressClassName: traefik
+  ingressClassName: noc-traefik
   rules:
     - host: monitor.skies.rmdn.dev # stats.samuraikurobushi.co.id
       http:
@@ -307,7 +300,6 @@ spec:
                   number: 3000
 
 ---
-# Ingress for Metabase
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -318,7 +310,7 @@ metadata:
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
 spec:
-  ingressClassName: traefik
+  ingressClassName: noc-traefik
   rules:
     - host: analytics.skies.rmdn.dev # analytics.samuraikurobushi.co.id
       http:
