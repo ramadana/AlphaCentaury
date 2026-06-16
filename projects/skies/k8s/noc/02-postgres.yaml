@@ -103,10 +103,14 @@ spec:
     spec:
       nodeSelector:
         skies/node-role: yulai
+      securityContext:
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
       containers:
         - name: postgres
           image: nrt.vultrcr.com/skcr/postgres
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - containerPort: 5432
               name: postgres

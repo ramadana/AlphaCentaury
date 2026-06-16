@@ -1,10 +1,6 @@
 # ============================================================
 # skies-noc: Bastion Host on Arnon (Metamorphosis)
 # Image spec: Projects/Arthworks/Metamorphosis/Dockerfile
-#
-# Prerequisite — create the SSH secret before applying:
-#   kubectl create secret generic noc-bastion-secret \
-#     --from-file=authorized_keys=/path/to/authorized_keys
 # ============================================================
 
 ---
@@ -58,7 +54,7 @@ data:
     HostKey /data/ssh/ssh_host_rsa_key
 
     PubkeyAuthentication yes
-    AuthorizedKeysFile /home/bastion/.ssh/authorized_keys
+    AuthorizedKeysFile /home/starlord/.ssh/authorized_keys
     PasswordAuthentication no
     PermitEmptyPasswords no
     KbdInteractiveAuthentication no
@@ -87,8 +83,8 @@ data:
     #!/bin/sh
     set -e
 
-    mkdir -p /data/ssh /home/bastion/.ssh
-    chmod 700 /home/bastion/.ssh
+    mkdir -p /data/ssh /home/starlord/.ssh
+    chmod 700 /home/starlord/.ssh
 
     if [ ! -f /data/ssh/ssh_host_ed25519_key ]; then
       echo "Generating SSH host keys..."
@@ -96,11 +92,15 @@ data:
       ssh-keygen -t rsa -b 4096 -f /data/ssh/ssh_host_rsa_key -N ""
     fi
 
-    id bastion >/dev/null 2>&1 || adduser -D -h /home/bastion -s /bin/sh bastion
+    id starlord >/dev/null 2>&1 || adduser -D -h /home/starlord -s /bin/sh starlord
 
-    cp /secrets/authorized_keys /home/bastion/.ssh/authorized_keys
-    chown -R bastion:bastion /home/bastion/.ssh
-    chmod 600 /home/bastion/.ssh/authorized_keys
+    printf '%s\n' \
+      'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC37jdwya/jtluj48aZpUXvQrjdj6RdcxRPLOi0cgRE/KKlNXoQudchu+RVym4dTpYor23t2LOZi2oFd/+LhVssNMFi7UJNCT1imFzo/XRzJ8baM4mImKoC9CWILQ1Op4PtmHgCjj0f5paPDgiyOGqXI1JtDSxdP6xw8msOMlDVoh+tan8GLhO9+jVXto+a2baeVl0rAmRPYV1SuHq30Af55GO5OCmFfhqeQ/mnqbGlV6GvRGgjbi8hyT3hS6AypDP+sH8LNKUjWhwgYBRSJhnlsWnTz7mfzDjh+gzuvKhyotVmWYJHiT2PyZs2n5MgH67bL811RFm35jxH+r3egq/YILAXQlwdunJucfebcX+CICzGiTBlw3mNgLX5WC09b9sYCf2WLt9Uo7xP8wwKKsM4UXbtxWEifF2nzMQbv6ExHk1d5tznQkSKCk+ct9FzVj3j1mAAr8WhT85VcZTiVoRJZESM5RSAom2DagOfqkyKlJrAKv3XdWOd7LQCaBZCCA0= rmdn@lindblum' \
+      'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDSeihniG0Ys9Eez14LRfiYgyGDAwuJD+Zm+IaXD+5ri3maycvjr3FCPTGcfaIa1dTm/zPTYo6ZmCO6/VUrOL3PZHxCrr9BVDN7SpaNaHc8SqRDDcvrX0KdsUR8x38GxVrk2KmfYm7n1JVQ+TRajIQMKpji8QKhz3cyXNpKnK3/Educ2UsDhsSEaL06WZj9BOBzzuFC5xTNG/ImoNBhpI8/uLxkgN8YqCqYaY42NyKlaVW/mivski+l1P1ssGBh0Wq9YYKSVm9I/bP05ckVmlrJOPqNX/Lzn9RKxvu/ahRidYd2Y3ulmHDkHQ0o4crscuxwKBuKBwxs9vV5vP7+vJCNj0593eoHOVrVFLCdhYjiw9CSPOfpPCxYtZVnA0VYsf/UYT+Igb7prF0BBSM/nrtiJRz8BJHOrTuBZd3MxEUrDBvYEEZXOhyV43EgLdJnUOlVjFT74A1GSAt6AqV0gHCp58kKpFgKtPvIZzcjCxhT/tbgymUuEsrXyfrLLmT6s5k= rmdn@stargate' \
+      > /home/starlord/.ssh/authorized_keys
+
+    chown -R starlord:starlord /home/starlord/.ssh
+    chmod 600 /home/starlord/.ssh/authorized_keys
 
     exec /usr/sbin/sshd -D -f /etc/ssh/sshd_config -e
 
@@ -128,8 +128,8 @@ spec:
         skies/node-role: arnon
       containers:
         - name: bastion
-          image: sgp.vultrcr.com/skcr/metamorphosis:latest
-          imagePullPolicy: IfNotPresent
+          image: nrt.vultrcr.com/skcr/metamorphosis:latest
+          imagePullPolicy: Always
           command: ["/bin/sh", "/scripts/start.sh"]
           ports:
             - containerPort: 22
@@ -151,9 +151,6 @@ spec:
             - name: startup-script
               mountPath: /scripts/start.sh
               subPath: start.sh
-            - name: ssh-keys
-              mountPath: /secrets
-              readOnly: true
           livenessProbe:
             tcpSocket:
               port: 22
@@ -175,12 +172,6 @@ spec:
           configMap:
             name: noc-bastion-startup
             defaultMode: 0755
-        - name: ssh-keys
-          secret:
-            secretName: noc-bastion-secret
-            items:
-              - key: authorized_keys
-                path: authorized_keys
 
 ---
 apiVersion: v1
