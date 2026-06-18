@@ -319,6 +319,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: metabase
+                name: noc-metabase
                 port:
                   number: 3000

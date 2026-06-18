@@ -81,6 +81,8 @@ data:
     CREATE DATABASE metabase_db;
     CREATE USER metabase_user WITH ENCRYPTED PASSWORD '36CA9C84.CCA5172BA885D4FAB0529B-49976F663F8A1639-B9597DB4C7.B9184C29';
     GRANT ALL PRIVILEGES ON DATABASE metabase_db TO metabase_user;
+    GRANT ALL ON SCHEMA public TO metabase_user;
+    ALTER DATABASE metabase_db OWNER TO metabase_user;
 
 ---
 # StatefulSet for PostgreSQL

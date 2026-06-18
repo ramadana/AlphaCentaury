@@ -1,0 +1,169 @@
+# ============================================================
+# skies-noc: Metabase on Yulai
+# Image: metabase/metabase (official)
+# Database: noc-postgres (metabase_db)
+# Public URL: https://analytics.skies.rmdn.dev (via noc-traefik)
+# ============================================================
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: noc-metabase-secret
+  namespace: default
+type: Opaque
+stringData:
+  encryption-secret-key: "60b8612cad9c8b5242b463f5511ee8faec474306658a15683ba4f51fc57a6c36"
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: noc-metabase-pv
+spec:
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-path
+  local:
+    path: /mnt/data/metabase
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: skies/node-role
+              operator: In
+              values:
+                - yulai
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: noc-metabase-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: noc-metabase
+  namespace: default
+  labels:
+    app: noc-metabase
+    skies/node-role: yulai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: noc-metabase
+  template:
+    metadata:
+      labels:
+        app: noc-metabase
+        skies/group: noc-analytics
+    spec:
+      nodeSelector:
+        skies/node-role: yulai
+      containers:
+        - name: metabase
+          image: metabase/metabase
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+              name: http
+              protocol: TCP
+          env:
+            - name: MB_SITE_URL
+              value: https://analytics.skies.rmdn.dev
+            - name: MB_DB_TYPE
+              value: postgres
+            - name: MB_DB_HOST
+              value: noc-postgres
+            - name: MB_DB_PORT
+              value: "5432"
+            - name: MB_DB_DBNAME
+              valueFrom:
+                secretKeyRef:
+                  name: noc-postgres-secret
+                  key: METABASE_DB
+            - name: MB_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: noc-postgres-secret
+                  key: METABASE_USER
+            - name: MB_DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: noc-postgres-secret
+                  key: METABASE_PASSWORD
+            - name: MB_ENCRYPTION_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: noc-metabase-secret
+                  key: encryption-secret-key
+            - name: MB_PLUGINS_DIR
+              value: /plugins
+            - name: MB_ANON_TRACKING_ENABLED
+              value: "false"
+            - name: MB_CHECK_FOR_UPDATES
+              value: "false"
+            - name: JAVA_OPTS
+              value: "-Xmx768m"
+          resources:
+            requests:
+              cpu: 250m
+              memory: 768Mi
+            limits:
+              cpu: 2000m
+              memory: 1536Mi
+          volumeMounts:
+            - name: metabase-plugins
+              mountPath: /plugins
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 120
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+      volumes:
+        - name: metabase-plugins
+          persistentVolumeClaim:
+            claimName: noc-metabase-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: noc-metabase
+  namespace: default
+  labels:
+    app: noc-metabase
+spec:
+  type: ClusterIP
+  selector:
+    app: noc-metabase
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+      protocol: TCP
