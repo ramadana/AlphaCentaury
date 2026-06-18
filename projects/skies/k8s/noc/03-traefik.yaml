@@ -295,7 +295,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: grafana
+                name: noc-grafana
                 port:
                   number: 3000
 
