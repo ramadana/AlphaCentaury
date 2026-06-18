@@ -16,7 +16,7 @@ metadata:
 type: Opaque
 stringData:
   admin-user: admin
-  admin-password: "CHANGE_ME_BEFORE_APPLY"
+  admin-password: "SKIES#R3inf0rc3d#Wa11!"
 
 ---
 apiVersion: v1
