@@ -1,0 +1,55 @@
+# ============================================================
+# skies-noc: ARC RunnerDeployment + Autoscaler
+# Organization: samurai
+# Runner Name: skies-production-runner
+# Max Concurrent: 3, scales to 0 when idle
+# ============================================================
+
+---
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: RunnerDeployment
+metadata:
+  name: skies-production-runner
+  namespace: arc-systems
+spec:
+  replicas: 0
+  template:
+    spec:
+      organization: samurai
+      labels:
+        - self-hosted
+        - linux
+        - github
+        - actions
+        - skies
+        - production
+      ephemeral: true
+      resources:
+        requests:
+          cpu: 200m
+          memory: 256Mi
+        limits:
+          cpu: 1000m
+          memory: 1Gi
+      nodeSelector:
+        skies/node-role: thera
+      dockerdWithinRunnerContainer: true
+
+---
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: HorizontalRunnerAutoscaler
+metadata:
+  name: skies-production-runner-autoscaler
+  namespace: arc-systems
+spec:
+  scaleTargetRef:
+    name: skies-production-runner
+  minReplicas: 0
+  maxReplicas: 3
+  scaleDownDelaySecondsAfterScaleOut: 300
+  metrics:
+    - type: PercentageRunnersBusy
+      scaleUpThreshold: '0.75'
+      scaleDownThreshold: '0.25'
+      scaleUpFactor: '2'
+      scaleDownFactor: '0.5'
