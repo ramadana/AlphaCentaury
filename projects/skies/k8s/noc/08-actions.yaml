@@ -1,21 +1,21 @@
 # ============================================================
 # skies-noc: ARC RunnerDeployment + Autoscaler
-# Organization: samurai
-# Runner Name: skies-production-runner
-# Max Concurrent: 3, scales to 0 when idle
+# Organization: EvoDigi
+# Runner Name: noc-skies-production-runner
+# Max Concurrent: 2, scales to 0 when idle
 # ============================================================
 
 ---
 apiVersion: actions.summerwind.dev/v1alpha1
 kind: RunnerDeployment
 metadata:
-  name: skies-production-runner
+  name: noc-skies-production-runner
   namespace: arc-systems
 spec:
   replicas: 0
   template:
     spec:
-      organization: samurai
+      organization: EvoDigi
       labels:
         - self-hosted
         - linux
@@ -26,11 +26,11 @@ spec:
       ephemeral: true
       resources:
         requests:
-          cpu: 200m
-          memory: 256Mi
+          cpu: 500m
+          memory: 768Mi
         limits:
-          cpu: 1000m
-          memory: 1Gi
+          cpu: 1500m
+          memory: 2560Mi
       nodeSelector:
         skies/node-role: thera
       dockerdWithinRunnerContainer: true
@@ -39,13 +39,13 @@ spec:
 apiVersion: actions.summerwind.dev/v1alpha1
 kind: HorizontalRunnerAutoscaler
 metadata:
-  name: skies-production-runner-autoscaler
+  name: noc-skies-production-runner-autoscaler
   namespace: arc-systems
 spec:
   scaleTargetRef:
-    name: skies-production-runner
+    name: noc-skies-production-runner
   minReplicas: 0
-  maxReplicas: 3
+  maxReplicas: 2
   scaleDownDelaySecondsAfterScaleOut: 300
   metrics:
     - type: PercentageRunnersBusy
