@@ -1,0 +1,34 @@
+# ============================================================
+# skies-noc: ARC v2 controller (Helm values)
+# Chart: gha-runner-scale-set-controller
+# OCI:   oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set-controller
+#
+# Install (after Helm 3.8+ is available on bastion):
+#   helm install arc \
+#     --namespace arc-systems --create-namespace \
+#     -f projects/skies/k8s/noc/08-actions-controller.yaml \
+#     oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set-controller
+#
+# Notes:
+# - ARC v2 does NOT require cert-manager (unlike legacy summerwind ARC).
+# - Keep the controller separate from runner pods (arc-systems vs arc-runners).
+# - Pin a chart version in production: append --version <chart-version>
+# ============================================================
+
+replicaCount: 1
+
+flags:
+  logLevel: info
+  logFormat: text
+
+# Schedule the controller on Arnon so it does not compete with runners on Thera.
+nodeSelector:
+  skies/node-role: arnon
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
